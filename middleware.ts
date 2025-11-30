@@ -32,21 +32,21 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session
+  // CHANGE: getUser() hits the DB to confirm user exists (getSession just checks the cookie)
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
+    data: { user },
+  } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
   const protectedPaths = ['/dashboard', '/songs']
   const isProtectedRoute = protectedPaths.some((path) => pathname.startsWith(path))
 
-  // Redirect logic
-  if (isProtectedRoute && !session) {
+  // Redirect logic using 'user' instead of 'session'
+  if (isProtectedRoute && !user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if ((pathname === '/login' || pathname === '/') && session) {
+  if ((pathname === '/login' || pathname === '/') && user) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
