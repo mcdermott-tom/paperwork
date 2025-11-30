@@ -1,6 +1,6 @@
 // app/dashboard/profile/page.tsx
 
-import { prisma } from '@/lib/prisma'
+import { db } from '@/lib/db'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import ProfileForm from './profile-form' // Import the new Client Component
@@ -20,7 +20,7 @@ async function getUserProfileData() {
   if (!user) return null
 
   // Fetch the profile data
-  const profile = await prisma.user.findUnique({ 
+  const profile = await db.user.findUnique({ 
     where: { id: user.id },
     select: { name: true, pro: true, ipiNumber: true } // Select only needed fields
   })

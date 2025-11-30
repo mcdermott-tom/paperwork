@@ -1,26 +1,22 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
-
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
-
-
 
 model User {
   id              String        @id @default(uuid())
   email           String        @unique
   name            String?
+  
+  // Added these two fields to fix your TypeScript error
+  pro             String?       // Performance Rights Org (e.g. "ASCAP", "BMI")
+  ipiNumber       String?       // The unique writer number
+  
   clerkId         String?       // Auth provider ID
   stripeConnectId String?       // Payout destination
   accounts        Account[]     // Users can belong to multiple teams
@@ -65,7 +61,7 @@ model WriterSplit {
   userId     String?
   user       User?   @relation(fields: [userId], references: [id])
   percentage Decimal @db.Decimal(5, 2) // 0-100.00
-  role       String // "Lyricist", "Composer"
+  role       String  // "Lyricist", "Composer"
 }
 
 model MasterSplit {
@@ -75,13 +71,13 @@ model MasterSplit {
   userId     String?
   user       User?   @relation(fields: [userId], references: [id])
   percentage Decimal @db.Decimal(5, 2)
-  role       String // "Producer", "Label"
+  role       String  // "Producer", "Label"
 }
 
 model SplitSheet {
-  id            String   @id @default(uuid())
+  id            String  @id @default(uuid())
   songId        String
-  status        String // "DRAFT", "SIGNED", "ACTIVE"
+  status        String  // "DRAFT", "SIGNED", "ACTIVE"
   pdfUrl        String?
   signatureHash String?
 }
