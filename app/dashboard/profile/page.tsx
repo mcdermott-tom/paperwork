@@ -1,62 +1,46 @@
-'use client'
+// app/dashboard/profile/page.tsx
 
-import { useState } from 'react'
-import { updateProfile } from './actions'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input' // run: npx shadcn@latest add input label
-import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button' // run: npx shadcn@latest add button
+import { prisma } from '@/lib/prisma'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+import ProfileForm from './profile-form' // Import the new Client Component
 
-export default function ProfilePage() {
-  const [loading, setLoading] = useState(false)
+// 1. Server-side data fetch function
+async function getUserProfileData() {
+  // Fix: Your compiler requires 'await' here due to dependency structure
+  const cookieStore = await cookies() 
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setLoading(true)
-    const formData = new FormData(event.currentTarget)
-    
-    try {
-      await updateProfile(formData)
-      alert('Profile updated successfully!')
-    } catch (e) {
-      alert('Failed to update profile')
-    } finally {
-      setLoading(false)
-    }
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
+  )
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  // Fetch the profile data
+  const profile = await prisma.user.findUnique({ 
+    where: { id: user.id },
+    select: { name: true, pro: true, ipiNumber: true } // Select only needed fields
+  })
+
+  // Security Check: Authorization—we should not proceed if the row is missing
+  if (!profile) {
+    // If the user exists in auth.users but not in public.User, redirect to a setup page or return null
+    return null
   }
+  
+  return profile
+}
+
+// Main component is now a Server Component (async function)
+export default async function ProfilePage() {
+  const userData = await getUserProfileData()
 
   return (
     <div className="container mx-auto p-6 max-w-2xl">
-      <Card>
-        <CardHeader>
-          <CardTitle>Artist Profile</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            
-            <div className="space-y-2">
-              <Label htmlFor="name">Legal Name / Artist Name</Label>
-              <Input name="name" id="name" placeholder="e.g. Miles Commodore" required />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="pro">Performance Rights Org (PRO)</Label>
-              <Input name="pro" id="pro" placeholder="e.g. ASCAP, BMI, PRS" />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="ipiNumber">IPI / CAE Number</Label>
-              <Input name="ipiNumber" id="ipiNumber" placeholder="e.g. 123456789" />
-              <p className="text-xs text-gray-500">This is the 9-digit number assigned to you by your PRO.</p>
-            </div>
-
-            <Button type="submit" disabled={loading} className="w-full">
-              {loading ? 'Saving...' : 'Save Changes'}
-            </Button>
-
-          </form>
-        </CardContent>
-      </Card>
+      <ProfileForm initialData={userData} />
     </div>
   )
 }
