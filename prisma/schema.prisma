@@ -1,0 +1,82 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+model User {
+  id              String        @id @default(uuid())
+  email           String        @unique
+  name            String?
+  clerkId         String?       // Auth provider ID
+  stripeConnectId String?       // Payout destination
+  accounts        Account[]     // Users can belong to multiple teams
+  writerSplits    WriterSplit[] // Inverse relation
+  masterSplits    MasterSplit[] // Inverse relation
+  createdAt       DateTime      @default(now())
+}
+
+model Account {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   // "personal", "manager", "label"
+  createdAt DateTime @default(now())
+}
+
+model Song {
+  id                 String        @id @default(uuid())
+  title              String
+  iswc               String?       @unique
+  writers            WriterSplit[]
+  releases           Release[]
+  cwrFileGeneratedAt DateTime?
+  createdAt          DateTime      @default(now())
+}
+
+model Release {
+  id           String        @id @default(uuid())
+  songId       String
+  song         Song          @relation(fields: [songId], references: [id])
+  upc          String?       @unique
+  isrc         String?       @unique
+  title        String
+  masterOwners MasterSplit[]
+  createdAt    DateTime      @default(now())
+}
+
+model WriterSplit {
+  id         String  @id @default(uuid())
+  songId     String
+  song       Song    @relation(fields: [songId], references: [id])
+  userId     String?
+  user       User?   @relation(fields: [userId], references: [id])
+  percentage Decimal @db.Decimal(5, 2) // 0-100.00
+  role       String // "Lyricist", "Composer"
+}
+
+model MasterSplit {
+  id         String  @id @default(uuid())
+  releaseId  String
+  release    Release @relation(fields: [releaseId], references: [id])
+  userId     String?
+  user       User?   @relation(fields: [userId], references: [id])
+  percentage Decimal @db.Decimal(5, 2)
+  role       String // "Producer", "Label"
+}
+
+model SplitSheet {
+  id            String   @id @default(uuid())
+  songId        String
+  status        String // "DRAFT", "SIGNED", "ACTIVE"
+  pdfUrl        String?
+  signatureHash String?
+}
