@@ -1,0 +1,2 @@
+# paperwork
+Artist Royalties
