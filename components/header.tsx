@@ -27,14 +27,10 @@ export function Header() {
     <header className="flex h-16 items-center justify-between border-b px-6 bg-white">
       {/* Left: Logo (Image Placeholder) & Dashboard Link */}
       <Link href="/dashboard" className="flex items-center">
-        {/*
-          NOTE: You MUST save your custom logo image (e.g., 'paperwork-logo.png') 
-          in your project's /public folder (or a subfolder like /public/images).
-        */}
         <img 
           src="/images/paperwork-logo.png" 
           alt="Paperwork Logo" 
-          width={100} // Adjusted width for better display
+          width={120} 
           height={24}
           className="h-6 w-auto" 
         />
@@ -43,6 +39,7 @@ export function Header() {
       {/* Right: Navigation & Profile */}
       <div className="flex items-center gap-6">
         <nav className="flex items-center gap-4 text-sm font-medium">
+          {/* RELEASES DROPDOWN (If you move /releases, update this too!) */}
           <DropdownMenu>
             <DropdownMenuTrigger className="hover:text-gray-600 transition-colors">Releases ▾</DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -51,11 +48,12 @@ export function Header() {
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {/* SONGS DROPDOWN (FIXED PATHS) */}
           <DropdownMenu>
             <DropdownMenuTrigger className="hover:text-gray-600 transition-colors">Songs ▾</DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem><Link href="/songs">View All</Link></DropdownMenuItem>
-              <DropdownMenuItem><Link href="/songs/new">New Song</Link></DropdownMenuItem>
+              <DropdownMenuItem><Link href="/dashboard/songs">View All</Link></DropdownMenuItem>
+              <DropdownMenuItem><Link href="/dashboard/songs/new">New Song</Link></DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 

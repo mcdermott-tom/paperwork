@@ -46,8 +46,8 @@ export async function createSong(formData: FormData) {
     return { error: 'Failed to create song' }
   }
 
-  revalidatePath('/songs')
-  redirect('/songs')
+  revalidatePath('/dashboard/songs')
+  redirect('/dashboard/songs')
 }
 
 // --- RELEASE ACTIONS ---

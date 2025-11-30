@@ -37,7 +37,7 @@ export default async function SongsListPage() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">My Songs</h1>
-        <Link href="/songs/new">
+        <Link href="/dashboard/songs/new">
           <Button>+ New Song</Button>
         </Link>
       </div>
@@ -67,7 +67,7 @@ export default async function SongsListPage() {
                     <TableCell>{song.iswc || '-'}</TableCell>
                     <TableCell>{song._count.releases}</TableCell>
                     <TableCell className="text-right">
-                      <Link href={`/songs/${song.id}`}>
+                      <Link href={`/dashboard/songs/${song.id}`}>
                         <Button variant="outline" size="sm">Manage</Button>
                       </Link>
                     </TableCell>
