@@ -2,8 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  // 1. Setup the default response (Pass-through)
-  // If anything fails, we return this so the site doesn't crash.
+  // 1. Initialize Response (The "Fail Open" default)
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -11,16 +10,17 @@ export async function middleware(request: NextRequest) {
   })
 
   try {
-    // 2. Load and Validate Keys
+    // 2. Environment Variable Check
+    // If these are missing on Vercel, we log it and exit gracefully instead of crashing.
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseKey) {
-      console.warn('Middleware Warning: Missing Supabase Environment Variables');
+      console.warn('⚠️ Middleware Warning: Supabase keys missing. Authentication disabled.');
       return response; 
     }
 
-    // 3. Create the Client
+    // 3. Initialize Supabase Client
     const supabase = createServerClient(
       supabaseUrl,
       supabaseKey,
@@ -49,42 +49,49 @@ export async function middleware(request: NextRequest) {
       }
     )
 
-    // 4. Check Auth
-    // We use getUser() because it validates the JWT signature on the server
+    // 4. Validate Session
+    // getUser() is safer than getSession() as it validates the auth token against the DB
     const {
       data: { user },
     } = await supabase.auth.getUser()
 
-    // 5. Protected Routes Logic
-    const { pathname } = request.nextUrl
+    // 5. Route Protection Logic
+    const url = request.nextUrl.clone()
     
-    // Explicitly list protected roots
-    const isProtectedPath = pathname.startsWith('/dashboard') || pathname.startsWith('/songs')
-
-    if (isProtectedPath && !user) {
-      return NextResponse.redirect(new URL('/login', request.url))
+    // Check if the user is trying to access a protected area
+    if (url.pathname.startsWith('/dashboard')) {
+      if (!user) {
+        // Redirect unauthenticated users to login
+        url.pathname = '/login'
+        return NextResponse.redirect(url)
+      }
     }
 
-    if ((pathname === '/login' || pathname === '/') && user) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+    // Check if a logged-in user is trying to access public auth pages
+    if ((url.pathname === '/login' || url.pathname === '/') && user) {
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
     }
 
     return response
 
-  } catch (e) {
-    // 6. CATCH EVERYTHING
-    // If Supabase crashes, just let the user through (Fail Open) to prevent a 500 Error
-    console.error('Middleware Crash:', e)
+  } catch (error) {
+    // 6. Resilience: If Supabase fails, don't crash the site.
+    // Log the error to Vercel so we can fix it, but let the user proceed.
+    console.error('🔥 Middleware Critical Error:', error)
     return response
   }
 }
 
 export const config = {
   matcher: [
-    '/',
-    '/login',
-    '/dashboard/:path*',
-    // Note: We moved songs to dashboard, but keeping this just in case
-    '/songs/:path*', 
+    /*
+     * Match all request paths except for:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - images/ (public images)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|images/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
