@@ -1,10 +1,20 @@
+// app/dashboard/songs/page.tsx
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+
+// NEW HELPER: Converts the clean T11-digit DB format back to the readable format
+const formatISWC = (iswc: string | null | undefined) => {
+    // Return null or unchanged if not the correct 11-char length
+    if (!iswc || iswc.length !== 11 || iswc[0] !== 'T') return iswc;
+    
+    // Format: T-DDD.DDD.DDD-D
+    return `${iswc[0]}-${iswc.slice(1, 4)}.${iswc.slice(4, 7)}.${iswc.slice(7, 10)}-${iswc[10]}`;
+};
 
 async function getMySongs() {
   const cookieStore = await cookies()
@@ -48,7 +58,7 @@ export default async function SongsListPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Title</TableHead>
-                <TableHead>ISWC</TableHead>
+                <TableHead>ISWC</TableHead> {/* This will show the formatted code */}
                 <TableHead>Releases</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
@@ -64,7 +74,8 @@ export default async function SongsListPage() {
                 songs.map((song) => (
                   <TableRow key={song.id}>
                     <TableCell className="font-medium">{song.title}</TableCell>
-                    <TableCell>{song.iswc || '-'}</TableCell>
+                    {/* FIX: Apply the formatter here */}
+                    <TableCell>{formatISWC(song.iswc) || '-'}</TableCell>
                     <TableCell>{song._count.releases}</TableCell>
                     <TableCell className="text-right">
                       <Link href={`/dashboard/songs/${song.id}`}>

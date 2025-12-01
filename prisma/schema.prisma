@@ -46,7 +46,7 @@ model Song {
 model Release {
   id           String        @id @default(uuid())
   songId       String
-  song         Song          @relation(fields: [songId], references: [id])
+  song         Song          @relation(fields: [songId], references: [id], onDelete: Cascade)
   upc          String?       @unique
   isrc         String?       @unique
   title        String
@@ -57,7 +57,7 @@ model Release {
 model WriterSplit {
   id         String  @id @default(uuid())
   songId     String
-  song       Song    @relation(fields: [songId], references: [id])
+  song       Song    @relation(fields: [songId], references: [id], onDelete: Cascade)
   userId     String?
   user       User?   @relation(fields: [userId], references: [id])
   percentage Decimal @db.Decimal(5, 2) // 0-100.00

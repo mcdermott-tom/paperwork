@@ -18,6 +18,20 @@ async function getUserId() {
   return user?.id
 }
 
+// HELPER: Strips non-alphanumeric characters for clean DB storage
+const sanitizeISWC = (iswc: string | null | undefined) => {
+    if (!iswc) return null;
+    const cleaned = iswc.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return cleaned || null;
+};
+
+// HELPER: Sanitize ISRC (US-XXX-24-12345 -> USXXX2412345)
+const sanitizeISRC = (isrc: string | null | undefined) => {
+    if (!isrc) return null;
+    return isrc.toUpperCase().replace(/[^A-Z0-9]/g, '');
+};
+
+
 // --- SONG ACTIONS ---
 
 export async function createSong(formData: FormData) {
@@ -25,16 +39,14 @@ export async function createSong(formData: FormData) {
   if (!userId) return { error: 'Unauthorized' }
 
   const title = formData.get('title') as string
-  const iswc = formData.get('iswc') as string
-
-  // app/dashboard/songs/actions.ts (Inside createSong function)
+  const iswc = formData.get('iswc') as string 
+  const iswcClean = sanitizeISWC(iswc); 
 
   try {
-    // Transaction: Create Song AND assign the creator as 100% writer
-    const newSong = await db.song.create({
+    await db.song.create({
       data: {
         title,
-        iswc: iswc || null,
+        iswc: iswcClean,
         writers: {
           create: {
             userId: userId,
@@ -45,16 +57,55 @@ export async function createSong(formData: FormData) {
       }
     })
   } catch (error) {
-    // FIX: Log the actual error object for debugging
     console.error('SONG CREATION PRISMA ERROR:', error)
-    
-    // Return a descriptive error to the client
-    return { error: 'Database update failed. Please check the terminal logs for the specific error code.' }
+    return { error: 'Database update failed.' }
   }
 
   revalidatePath('/dashboard/songs')
   redirect('/dashboard/songs')
 }
+
+export async function updateSongMetadata(formData: FormData) {
+  const userId = await getUserId()
+  if (!userId) return { error: 'Unauthorized' }
+
+  const id = formData.get('id') as string 
+  const title = formData.get('title') as string
+  const iswc = formData.get('iswc') as string
+  const iswcClean = sanitizeISWC(iswc); 
+
+  try {
+    await db.song.update({
+      where: { id },
+      data: {
+        title,
+        iswc: iswcClean,
+      }
+    })
+    revalidatePath(`/dashboard/songs/${id}`)
+    return { success: true }
+  } catch (error) {
+    console.error("SONG UPDATE PRISMA ERROR:", error)
+    return { error: 'Failed to update song metadata.' }
+  }
+}
+
+export async function deleteSong(id: string) {
+  const userId = await getUserId()
+  if (!userId) throw new Error('Unauthorized')
+
+  try {
+    await db.song.delete({
+      where: { id }
+    })
+  } catch (error) {
+    console.error("SONG DELETE PRISMA ERROR:", error)
+    return { error: 'Failed to delete song.' }
+  }
+
+  redirect('/dashboard/songs')
+}
+
 
 // --- RELEASE ACTIONS ---
 
@@ -71,65 +122,54 @@ export async function createRelease(formData: FormData) {
       data: {
         songId,
         title,
-        isrc: isrc || null,
-        // For MVP, we aren't creating MasterSplits yet, just the record
+        isrc: sanitizeISRC(isrc),
       }
     })
-    
-    revalidatePath(`/songs/${songId}`)
+    revalidatePath(`/dashboard/songs/${songId}`)
     return { success: true }
   } catch (error) {
-    console.error(error)
-    return { error: 'Failed to create release' }
+    console.error("CREATE RELEASE ERROR:", error)
+    return { error: 'Failed to create release.' }
   }
 }
 
-
-
-// app/dashboard/songs/actions.ts (Add these functions at the bottom)
-
-// --- UPDATE ACTION ---
-export async function updateSongMetadata(formData: FormData) {
+// ADDED: Missing Update Action
+export async function updateRelease(formData: FormData) {
   const userId = await getUserId()
   if (!userId) return { error: 'Unauthorized' }
 
-  const id = formData.get('id') as string // The Song ID
+  const id = formData.get('id') as string
+  const songId = formData.get('songId') as string // Needed for revalidation
   const title = formData.get('title') as string
-  const iswc = formData.get('iswc') as string
+  const isrc = formData.get('isrc') as string
 
   try {
-    // Note: Add logic here to ensure the user (userId) is a writer on the song before updating!
-    await db.song.update({
+    await db.release.update({
       where: { id },
       data: {
         title,
-        iswc: iswc || null,
+        isrc: sanitizeISRC(isrc),
       }
     })
-    revalidatePath(`/dashboard/songs/${id}`)
+    revalidatePath(`/dashboard/songs/${songId}`)
     return { success: true }
   } catch (error) {
-    console.error("SONG UPDATE PRISMA ERROR:", error)
-    return { error: 'Failed to update song metadata.' }
+    console.error("UPDATE RELEASE ERROR:", error)
+    return { error: 'Failed to update release.' }
   }
 }
 
-// --- DELETE ACTION ---
-export async function deleteSong(id: string) {
+// ADDED: Missing Delete Action
+export async function deleteRelease(id: string, songId: string) {
   const userId = await getUserId()
-  if (!userId) throw new Error('Unauthorized')
+  if (!userId) return { error: 'Unauthorized' }
 
   try {
-    // Deleting the song will automatically delete associated WriterSplits and Releases (if configured with CASCADE in Prisma/DB)
-    // For now, we rely on the DB cascade, but we should verify the user owns the song.
-    await db.song.delete({
-      where: { id }
-    })
+    await db.release.delete({ where: { id } })
+    revalidatePath(`/dashboard/songs/${songId}`)
+    return { success: true }
   } catch (error) {
-    console.error("SONG DELETE PRISMA ERROR:", error)
-    return { error: 'Failed to delete song.' }
+    console.error("DELETE RELEASE ERROR:", error)
+    return { error: 'Failed to delete release.' }
   }
-
-  // Redirect to the list page after deletion
-  redirect('/dashboard/songs')
 }

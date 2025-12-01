@@ -2,11 +2,8 @@
 
 import { db } from '@/lib/db'
 import Link from 'next/link'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Trash2 } from 'lucide-react'
-
-// IMPORT CLIENT COMPONENTS from the separate file
+import { Card, CardContent } from '@/components/ui/card' // Added missing imports
 import {
     SongMetadataForm,
     DeleteSongButton,
@@ -14,13 +11,16 @@ import {
     WritersTable
 } from './detail-client'
 
-// --- 1. SERVER COMPONENT (Data Fetch) ---
+// HELPER: Formats raw DB string (T1234567890) to Human Readable (T-123.456.789-0)
+const formatISWC = (iswc: string | null | undefined) => {
+  if (!iswc || iswc.length !== 11 || iswc[0] !== 'T') return iswc;
+  return `${iswc[0]}-${iswc.slice(1, 4)}.${iswc.slice(4, 7)}.${iswc.slice(7, 10)}-${iswc[10]}`;
+};
+
+// --- SERVER COMPONENT (Data Fetch) ---
 
 async function getSongDetails(id: string | undefined) {
-  // FIX: Return early if the ID is missing (Prisma requires a defined ID)
-  if (!id) {
-    return null; 
-  }
+  if (!id) return null; 
   
   return await db.song.findUnique({
     where: { id },
@@ -45,21 +45,24 @@ export default async function SongDetailPage({ params }: { params: { id: string 
     </div>
   ); 
 
+  // FIX: Format the string before rendering
+  const displayISWC = formatISWC(song.iswc);
+
   return (
     <div className="container mx-auto p-6 space-y-8">
       <div className="flex justify-between items-start border-b pb-4">
         <div>
           <h1 className="text-3xl font-bold">{song.title}</h1>
-          <p className="text-gray-500 mt-1">ISWC: {song.iswc || 'Not Registered'}</p>
+          {/* FIX: Use the formatted variable here */}
+          <p className="text-gray-500 mt-1">ISWC: {displayISWC || 'Not Registered'}</p>
         </div>
         <DeleteSongButton songId={song.id} songTitle={song.title} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         
-        {/* COLUMN 1: METADATA EDIT FORM (Client Component) */}
+        {/* COLUMN 1: METADATA EDIT FORM */}
         <div className="md:col-span-1">
-          {/* CRITICAL: Pass song.id to the client form for the server action */}
           <SongMetadataForm initialData={song} songId={song.id} />
         </div>
 
@@ -73,7 +76,7 @@ export default async function SongDetailPage({ params }: { params: { id: string 
           </Card>
         </div>
 
-        {/* COLUMN 3: WRITERS LIST (Composition Splits) - Takes full width for now */}
+        {/* COLUMN 3: WRITERS LIST */}
         <div className="md:col-span-3">
           <h2 className="text-xl font-semibold mb-4">Writers (Composition)</h2>
           <WritersTable writers={song.writers} />
@@ -82,5 +85,3 @@ export default async function SongDetailPage({ params }: { params: { id: string 
     </div>
   )
 }
-
-// NOTE: All client component function bodies were moved to detail-client.tsx

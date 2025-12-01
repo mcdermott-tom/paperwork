@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Trash2 } from 'lucide-react'
 import Link from 'next/link'
 
+
 // NOTE: You must have run `npm install @prisma/client` and `npx prisma generate` for these types to be available
 import type { Release, WriterSplit, User } from '@prisma/client'
 

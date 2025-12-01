@@ -24,7 +24,7 @@ export function Header() {
   }
 
   return (
-    <header className="flex h-16 items-center justify-between border-b px-6 bg-white">
+    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b px-6 bg-white">
       {/* Left: Logo (Image Placeholder) & Dashboard Link */}
       <Link href="/dashboard" className="flex items-center">
         <img 
@@ -43,8 +43,8 @@ export function Header() {
           <DropdownMenu>
             <DropdownMenuTrigger className="hover:text-gray-600 transition-colors">Releases ▾</DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem><Link href="/releases">View All</Link></DropdownMenuItem>
-              <DropdownMenuItem><Link href="/releases/new">New Release</Link></DropdownMenuItem>
+              <DropdownMenuItem><Link href="/dashboard/releases">View All</Link></DropdownMenuItem>
+              <DropdownMenuItem><Link href="/dashboard/releases/new">New Release</Link></DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
