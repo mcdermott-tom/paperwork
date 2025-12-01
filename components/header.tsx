@@ -1,3 +1,4 @@
+// components/header.tsx
 'use client'
 
 import Link from 'next/link'
@@ -17,28 +18,52 @@ export function Header() {
   const router = useRouter()
   const supabase = createClient()
   const [mounted, setMounted] = useState(false)
+  
+  // NEW STATE: To hold the user's fetched profile image URL
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
-  // Fix hydration mismatch by only rendering complex interactive elements after mount
   useEffect(() => {
     setMounted(true)
-  }, [])
+    // NEW: Fetch the user profile data client-side after mounting
+    async function fetchUserAvatar() {
+        // We use the simpler supabase.auth.getUser() on the client for performance
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (user) {
+            // Since we updated avatarUrl in the public.User table (via server action), 
+            // we have to retrieve it from the server's endpoint. 
+            // The simplest path: Fetch the profile data again (assuming you pass a prop or use a custom hook).
+            
+            // However, since we stored the avatar in the User DB table:
+            const { data: profile } = await supabase
+                .from('User') // Use the name of your table
+                .select('avatarUrl')
+                .eq('id', user.id)
+                .single()
+            
+            if (profile && profile.avatarUrl) {
+                setAvatarUrl(profile.avatarUrl)
+            }
+        }
+    }
+    fetchUserAvatar();
+  }, [supabase]) // Dependency on supabase client
+
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b px-6 bg-white">
+        <div className="flex items-center">
+           <div className="h-6 w-[120px]" /> 
+        </div>
+      </header>
+    )
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
-  }
-
-  // Prevent hydration mismatch for the user dropdown
-  if (!mounted) {
-    return (
-      <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b px-6 bg-white">
-        <div className="flex items-center">
-           {/* Static Logo Placeholder to prevent layout shift */}
-           <div className="h-6 w-[120px]" /> 
-        </div>
-      </header>
-    )
   }
 
   return (
@@ -68,7 +93,6 @@ export function Header() {
           <DropdownMenu>
             <DropdownMenuTrigger className="hover:text-gray-600 transition-colors">Songs ▾</DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem><Link href="/dashboard/ingest">Import CSV</Link></DropdownMenuItem>
               <DropdownMenuItem><Link href="/dashboard/songs">View All</Link></DropdownMenuItem>
               <DropdownMenuItem><Link href="/dashboard/songs/new">New Song</Link></DropdownMenuItem>
             </DropdownMenuContent>
@@ -87,7 +111,8 @@ export function Header() {
         <DropdownMenu>
           <DropdownMenuTrigger>
             <Avatar className="h-8 w-8 cursor-pointer">
-              <AvatarImage src="" /> 
+              {/* FIX: Use the fetched avatar URL */}
+              <AvatarImage src={avatarUrl || undefined} /> 
               <AvatarFallback><User className="h-4 w-4" /></AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
