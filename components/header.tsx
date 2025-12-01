@@ -1,4 +1,3 @@
-// components/header.tsx
 'use client'
 
 import Link from 'next/link'
@@ -12,10 +11,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { useState, useEffect } from 'react'
 
 export function Header() {
   const router = useRouter()
   const supabase = createClient()
+  const [mounted, setMounted] = useState(false)
+
+  // Fix hydration mismatch by only rendering complex interactive elements after mount
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -23,9 +29,21 @@ export function Header() {
     router.refresh()
   }
 
+  // Prevent hydration mismatch for the user dropdown
+  if (!mounted) {
+    return (
+      <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b px-6 bg-white">
+        <div className="flex items-center">
+           {/* Static Logo Placeholder to prevent layout shift */}
+           <div className="h-6 w-[120px]" /> 
+        </div>
+      </header>
+    )
+  }
+
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b px-6 bg-white">
-      {/* Left: Logo (Image Placeholder) & Dashboard Link */}
+      {/* Left: Logo & Dashboard Link */}
       <Link href="/dashboard" className="flex items-center">
         <img 
           src="/images/paperwork-logo.png" 
@@ -39,7 +57,6 @@ export function Header() {
       {/* Right: Navigation & Profile */}
       <div className="flex items-center gap-6">
         <nav className="flex items-center gap-4 text-sm font-medium">
-          {/* RELEASES DROPDOWN (If you move /releases, update this too!) */}
           <DropdownMenu>
             <DropdownMenuTrigger className="hover:text-gray-600 transition-colors">Releases ▾</DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -48,7 +65,6 @@ export function Header() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* SONGS DROPDOWN (FIXED PATHS) */}
           <DropdownMenu>
             <DropdownMenuTrigger className="hover:text-gray-600 transition-colors">Songs ▾</DropdownMenuTrigger>
             <DropdownMenuContent>

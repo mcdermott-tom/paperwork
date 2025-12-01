@@ -49,10 +49,11 @@ export default async function SongDetailPage({ params }: { params: Promise<{ id:
   const displayISWC = formatISWC(song.iswc);
 
   // 2. Format Writers for Client (Decimal -> Number)
-  const writersForClient = song.writers.map(writer => ({
-    ...writer,
-    percentage: writer.percentage.toNumber(), 
-  }));
+const writersForClient = song.writers.map(writer => ({
+  ...writer,
+  percentage: writer.percentage.toNumber(),
+  email: writer.email, // Pass the raw email field
+}));
 
   // 3. FIX: Create a "Clean" object for the Metadata Form
   // We explicitly pick only the fields needed, ensuring 'writers' (with decimals) are NOT passed.
@@ -94,7 +95,10 @@ export default async function SongDetailPage({ params }: { params: Promise<{ id:
         {/* COLUMN 3: WRITERS LIST */}
         <div className="md:col-span-3">
           <h2 className="text-xl font-semibold mb-4">Writers (Composition)</h2>
-          <WritersTable writers={writersForClient} />
+          
+          {/* UPDATE: Pass songId here! */}
+          <WritersTable writers={writersForClient} songId={song.id} />
+          
         </div>
       </div>
     </div>

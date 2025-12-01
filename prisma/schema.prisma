@@ -58,10 +58,15 @@ model WriterSplit {
   id         String  @id @default(uuid())
   songId     String
   song       Song    @relation(fields: [songId], references: [id], onDelete: Cascade)
+  
+  // FIX: Make userId optional, add email for invites
   userId     String?
   user       User?   @relation(fields: [userId], references: [id])
-  percentage Decimal @db.Decimal(5, 2) // 0-100.00
-  role       String  // "Lyricist", "Composer"
+  
+  email      String? // Stores the email if they haven't signed up yet
+  
+  percentage Decimal @db.Decimal(5, 2)
+  role       String
 }
 
 model MasterSplit {

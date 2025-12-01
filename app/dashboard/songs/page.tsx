@@ -1,4 +1,5 @@
 // app/dashboard/songs/page.tsx
+
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { createServerClient } from '@supabase/ssr'
@@ -7,12 +8,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
-// NEW HELPER: Converts the clean T11-digit DB format back to the readable format
+// HELPER: Formats raw DB string (T1234567890) to Human Readable (T-123.456.789-0)
 const formatISWC = (iswc: string | null | undefined) => {
-    // Return null or unchanged if not the correct 11-char length
     if (!iswc || iswc.length !== 11 || iswc[0] !== 'T') return iswc;
-    
-    // Format: T-DDD.DDD.DDD-D
     return `${iswc[0]}-${iswc.slice(1, 4)}.${iswc.slice(4, 7)}.${iswc.slice(7, 10)}-${iswc[10]}`;
 };
 
@@ -26,15 +24,12 @@ async function getMySongs() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
-  // Find songs where I am listed as a writer
   return await db.song.findMany({
     where: {
-      writers: {
-        some: { userId: user.id }
-      }
+      writers: { some: { userId: user.id } }
     },
     include: {
-      _count: { select: { releases: true } } // Count how many releases exist
+      _count: { select: { releases: true } }
     },
     orderBy: { createdAt: 'desc' }
   })
@@ -58,7 +53,7 @@ export default async function SongsListPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Title</TableHead>
-                <TableHead>ISWC</TableHead> {/* This will show the formatted code */}
+                <TableHead>ISWC</TableHead>
                 <TableHead>Releases</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
@@ -74,7 +69,6 @@ export default async function SongsListPage() {
                 songs.map((song) => (
                   <TableRow key={song.id}>
                     <TableCell className="font-medium">{song.title}</TableCell>
-                    {/* FIX: Apply the formatter here */}
                     <TableCell>{formatISWC(song.iswc) || '-'}</TableCell>
                     <TableCell>{song._count.releases}</TableCell>
                     <TableCell className="text-right">
