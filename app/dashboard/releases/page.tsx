@@ -86,7 +86,7 @@ export default async function ReleasesListPage() {
                     <TableCell className="font-mono text-xs">{formatISRC(release.isrc) || '-'}</TableCell>
                     <TableCell className="text-right">
                       {/* Redirect to the Song page to manage the release */}
-                      <Link href={`/dashboard/songs/${release.song.id}`}>
+                      <Link href={`/dashboard/releases/${release.id}`}>
                         <Button variant="outline" size="sm">Manage</Button>
                       </Link>
                     </TableCell>
