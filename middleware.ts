@@ -1,4 +1,3 @@
-// middleware.ts
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
@@ -9,9 +8,19 @@ export async function middleware(request: NextRequest) {
     },
   })
 
+  // SAFETY CHECK: Verify keys exist before initializing
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('Middleware Error: Missing Supabase Environment Variables');
+    // Allow the request to proceed (or redirect to error) instead of crashing
+    return response; 
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         getAll() {
@@ -32,7 +41,7 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // CHANGE: getUser() hits the DB to confirm user exists (getSession just checks the cookie)
+  // ... rest of your auth logic ...
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -41,7 +50,6 @@ export async function middleware(request: NextRequest) {
   const protectedPaths = ['/dashboard', '/songs']
   const isProtectedRoute = protectedPaths.some((path) => pathname.startsWith(path))
 
-  // Redirect logic using 'user' instead of 'session'
   if (isProtectedRoute && !user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
