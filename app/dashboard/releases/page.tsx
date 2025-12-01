@@ -8,8 +8,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Plus, Music2 } from 'lucide-react'
+import { ReleaseArtwork } from '@/components/artwork' // Ensure this component is imported
 
-// Helper: Get all releases for the user
+// HELPER: Get all releases for the user
 async function getMyReleases() {
   const cookieStore = await cookies()
   const supabase = createServerClient(
@@ -20,7 +21,6 @@ async function getMyReleases() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
-  // Find releases linked to songs where I am a writer
   return await db.release.findMany({
     where: {
       song: {
@@ -28,7 +28,7 @@ async function getMyReleases() {
       }
     },
     include: {
-      song: { select: { title: true, id: true } } // Include parent song info
+      song: { select: { title: true, id: true } }
     },
     orderBy: { createdAt: 'desc' }
   })
@@ -60,7 +60,7 @@ export default async function ReleasesListPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Release Title</TableHead>
+                <TableHead className="w-[350px]">Release Title</TableHead>
                 <TableHead>Parent Song</TableHead>
                 <TableHead>ISRC</TableHead>
                 <TableHead className="text-right">Action</TableHead>
@@ -76,7 +76,15 @@ export default async function ReleasesListPage() {
               ) : (
                 releases.map((release) => (
                   <TableRow key={release.id}>
-                    <TableCell className="font-medium">{release.title}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-4">
+                        <ReleaseArtwork url={release.coverArtUrl} size="sm" />
+                        <div>
+                          <div className="font-medium">{release.title}</div>
+                          <div className="text-xs text-gray-500">{release.song.title}</div>
+                        </div>
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Link href={`/dashboard/songs/${release.song.id}`} className="hover:underline flex items-center gap-2 text-blue-600">
                         <Music2 className="h-3 w-3" />
@@ -85,7 +93,6 @@ export default async function ReleasesListPage() {
                     </TableCell>
                     <TableCell className="font-mono text-xs">{formatISRC(release.isrc) || '-'}</TableCell>
                     <TableCell className="text-right">
-                      {/* Redirect to the Song page to manage the release */}
                       <Link href={`/dashboard/releases/${release.id}`}>
                         <Button variant="outline" size="sm">Manage</Button>
                       </Link>
