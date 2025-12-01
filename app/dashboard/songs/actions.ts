@@ -5,7 +5,8 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { Resend } from 'resend' // NEW IMPORT
+import { Resend } from 'resend' 
+import { createAuditLog } from '@/lib/logger'; // Assumed function
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -46,7 +47,7 @@ export async function createSong(formData: FormData) {
   const iswcClean = sanitizeISWC(iswc); 
 
   try {
-    await db.song.create({
+    const newSong = await db.song.create({
       data: {
         title,
         iswc: iswcClean,
@@ -59,6 +60,17 @@ export async function createSong(formData: FormData) {
         }
       }
     })
+    
+    // LOG: Log the creation
+    await createAuditLog({
+        userId: userId,
+        action: 'SONG_CREATED',
+        entity: 'Song',
+        entityId: newSong.id,
+        newData: newSong, // Pass the created object
+        oldData: undefined, // Explicitly use undefined for no old data
+    });
+
   } catch (error) {
     console.error('SONG CREATION PRISMA ERROR:', error)
     return { error: 'Database update failed.' }
@@ -78,13 +90,27 @@ export async function updateSongMetadata(formData: FormData) {
   const iswcClean = sanitizeISWC(iswc); 
 
   try {
-    await db.song.update({
+    // 1. Fetch current state for oldData log
+    const oldSong = await db.song.findUnique({ where: { id } });
+
+    const newSong = await db.song.update({
       where: { id },
       data: {
         title,
         iswc: iswcClean,
       }
     })
+    
+    // 2. Log the update
+    await createAuditLog({
+        userId: userId,
+        action: 'METADATA_UPDATED',
+        entity: 'Song',
+        entityId: id,
+        oldData: oldSong,
+        newData: newSong,
+    });
+
     revalidatePath(`/dashboard/songs/${id}`)
     return { success: true }
   } catch (error) {
@@ -98,7 +124,18 @@ export async function deleteSong(id: string) {
   if (!userId) throw new Error('Unauthorized')
 
   try {
-    await db.song.delete({ where: { id } })
+    const deletedSong = await db.song.delete({ where: { id } });
+    
+    // LOG: Log the deletion
+    await createAuditLog({
+        userId: userId,
+        action: 'SONG_DELETED',
+        entity: 'Song',
+        entityId: id,
+        oldData: deletedSong,
+        newData: undefined,
+    });
+    
   } catch (error) {
     console.error("SONG DELETE PRISMA ERROR:", error)
     return { error: 'Failed to delete song.' }
@@ -131,6 +168,7 @@ export async function addWriter(formData: FormData) {
     // 2. Check Database for User
     const writerUser = await db.user.findUnique({ where: { email } })
 
+    // 3. Prevent Duplicate Logic
     if (writerUser) {
       const existingSplit = await db.writerSplit.findFirst({
         where: { songId, userId: writerUser.id }
@@ -138,8 +176,8 @@ export async function addWriter(formData: FormData) {
       if (existingSplit) return { error: 'This user is already a writer on this song.' }
     }
 
-    // 3. Create Split
-    await db.writerSplit.create({
+    // 4. Create the split
+    const newSplit = await db.writerSplit.create({
       data: {
         songId,
         role,
@@ -148,15 +186,24 @@ export async function addWriter(formData: FormData) {
         email: writerUser ? null : email,          
       }
     })
+    
+    // 5. Log the action
+    await createAuditLog({
+        userId: userId,
+        action: 'SPLIT_ADDED',
+        entity: 'WriterSplit',
+        entityId: newSplit.id,
+        newData: newSplit,
+        oldData: undefined,
+    });
 
-    // 4. SAFELY SEND EMAIL (Don't crash if this fails)
+    // 6. SAFELY SEND EMAIL (Non-fatal)
     try {
         const apiKey = process.env.RESEND_API_KEY;
         if (apiKey) {
             const artistName = inviter?.name || inviter?.email || "A collaborator";
-            const inviteLink = "http://localhost:3000/login"; // TODO: Update for prod
+            const inviteLink = "http://localhost:3000/login";
 
-            // Only send if they aren't already a user
             if (!writerUser) {
                 await resend.emails.send({
                     from: 'Paperwork <onboarding@resend.dev>',
@@ -178,7 +225,6 @@ export async function addWriter(formData: FormData) {
         }
     } catch (emailError) {
         console.error("EMAIL SEND FAILED (Non-fatal):", emailError);
-        // We do NOT return an error here, because the DB write succeeded.
     }
 
     revalidatePath(`/dashboard/songs/${songId}`)
@@ -200,10 +246,24 @@ export async function updateSplit(formData: FormData) {
   const percentage = parseFloat(formData.get('percentage') as string)
 
   try {
-    await db.writerSplit.update({
+    // 1. Fetch old data before update
+    const oldSplit = await db.writerSplit.findUnique({ where: { id: splitId } });
+
+    // 2. Perform Update
+    const newSplit = await db.writerSplit.update({
       where: { id: splitId },
       data: { role, percentage }
     })
+
+    // 3. Log the change
+    await createAuditLog({
+        userId: userId,
+        action: 'SPLIT_UPDATED',
+        entity: 'WriterSplit',
+        entityId: splitId,
+        oldData: oldSplit,
+        newData: newSplit,
+    });
     
     revalidatePath(`/dashboard/songs/${songId}`)
     return { success: true }
@@ -217,7 +277,18 @@ export async function deleteSplit(splitId: string, songId: string) {
   if (!userId) return { error: 'Unauthorized' }
 
   try {
-    await db.writerSplit.delete({ where: { id: splitId } })
+    const deletedSplit = await db.writerSplit.delete({ where: { id: splitId } })
+    
+    // Log the deletion
+    await createAuditLog({
+        userId: userId,
+        action: 'SPLIT_DELETED',
+        entity: 'WriterSplit',
+        entityId: splitId,
+        oldData: deletedSplit,
+        newData: undefined,
+    });
+    
     revalidatePath(`/dashboard/songs/${songId}`)
     return { success: true }
   } catch (error) {
@@ -237,13 +308,24 @@ export async function createRelease(formData: FormData) {
   const isrc = formData.get('isrc') as string
 
   try {
-    await db.release.create({
+    const newRelease = await db.release.create({
       data: {
         songId,
         title,
         isrc: sanitizeISRC(isrc),
       }
     })
+    
+    // Log the creation
+    await createAuditLog({
+        userId: userId,
+        action: 'RELEASE_CREATED',
+        entity: 'Release',
+        entityId: newRelease.id,
+        newData: newRelease,
+        oldData: undefined,
+    });
+    
     revalidatePath(`/dashboard/songs/${songId}`)
     return { success: true }
   } catch (error) {
@@ -262,13 +344,26 @@ export async function updateRelease(formData: FormData) {
   const isrc = formData.get('isrc') as string
 
   try {
-    await db.release.update({
+    const oldRelease = await db.release.findUnique({ where: { id } });
+
+    const newRelease = await db.release.update({
       where: { id },
       data: {
         title,
         isrc: sanitizeISRC(isrc),
       }
     })
+    
+    // Log the update
+    await createAuditLog({
+        userId: userId,
+        action: 'RELEASE_UPDATED',
+        entity: 'Release',
+        entityId: id,
+        oldData: oldRelease,
+        newData: newRelease,
+    });
+    
     revalidatePath(`/dashboard/songs/${songId}`)
     return { success: true }
   } catch (error) {
@@ -282,11 +377,21 @@ export async function deleteRelease(id: string, songId: string) {
   if (!userId) return { error: 'Unauthorized' }
 
   try {
-    await db.release.delete({ where: { id } })
+    const deletedRelease = await db.release.delete({ where: { id } })
+    
+    // Log the deletion
+    await createAuditLog({
+        userId: userId,
+        action: 'RELEASE_DELETED',
+        entity: 'Release',
+        entityId: id,
+        oldData: deletedRelease,
+        newData: undefined,
+    });
+    
     revalidatePath(`/dashboard/songs/${songId}`)
     return { success: true }
   } catch (error) {
-    console.error("DELETE RELEASE ERROR:", error)
     return { error: 'Failed to delete release.' }
   }
 }

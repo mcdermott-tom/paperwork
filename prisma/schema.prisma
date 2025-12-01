@@ -91,3 +91,17 @@ model SplitSheet {
   pdfUrl        String?
   signatureHash String?
 }
+
+
+// Add this new model to your schema
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?  // The user who initiated the change
+  action    String   // e.g., "SPLIT_UPDATED", "CONTRACT_SIGNED", "SONG_DELETED"
+  entity    String   // e.g., "WriterSplit", "Song", "Release"
+  entityId  String   // The ID of the affected record
+  oldData   Json?    // Optional: stores the state before the change
+  newData   Json?    // Optional: stores the state after the change
+  ipAddress String?  // IP address of the requester (CRITICAL for legal evidence)
+  createdAt DateTime @default(now())
+}
