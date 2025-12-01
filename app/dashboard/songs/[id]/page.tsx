@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Disc, Music2, Plus } from 'lucide-react'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { DownloadSplitSheetButton } from './pdf-button'
 
 // Client Components
 import { 
@@ -141,8 +142,13 @@ export default async function SongDetailPage({ params }: { params: Promise<{ id:
 
           {/* 2. WRITERS (SPLITS) - IN MIDDLE */}
           <section>
-             <h2 className="text-xl font-bold mb-4">Writers (Composition)</h2>
-             {/* This component now handles the Splits Table AND the Chart below it */}
+             <div className="flex justify-between items-center mb-4">
+               <h2 className="text-xl font-bold">Writers (Composition)</h2>
+               
+               {/* NEW: Download Button */}
+               <DownloadSplitSheetButton song={songMetadata} writers={writersForClient} />
+             </div>
+             
              <WritersTable writers={writersForClient} songId={song.id} />
           </section>
 
