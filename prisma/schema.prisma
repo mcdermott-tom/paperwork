@@ -12,16 +12,18 @@ model User {
   id              String        @id @default(uuid())
   email           String        @unique
   name            String?
+  pro             String?       
+  ipiNumber       String?       
   
-  // Added these two fields to fix your TypeScript error
-  pro             String?       // Performance Rights Org (e.g. "ASCAP", "BMI")
-  ipiNumber       String?       // The unique writer number
+  // NEW: Spotify Metadata
+  spotifyArtistId String?       @unique // The "URI" from Spotify
+  avatarUrl       String?       // Their public profile pic
   
-  clerkId         String?       // Auth provider ID
-  stripeConnectId String?       // Payout destination
-  accounts        Account[]     // Users can belong to multiple teams
-  writerSplits    WriterSplit[] // Inverse relation
-  masterSplits    MasterSplit[] // Inverse relation
+  clerkId         String?       
+  stripeConnectId String?       
+  accounts        Account[]     
+  writerSplits    WriterSplit[] 
+  masterSplits    MasterSplit[] 
   createdAt       DateTime      @default(now())
 }
 

@@ -68,6 +68,7 @@ export function Header() {
           <DropdownMenu>
             <DropdownMenuTrigger className="hover:text-gray-600 transition-colors">Songs ▾</DropdownMenuTrigger>
             <DropdownMenuContent>
+              <DropdownMenuItem><Link href="/dashboard/ingest">Import CSV</Link></DropdownMenuItem>
               <DropdownMenuItem><Link href="/dashboard/songs">View All</Link></DropdownMenuItem>
               <DropdownMenuItem><Link href="/dashboard/songs/new">New Song</Link></DropdownMenuItem>
             </DropdownMenuContent>
