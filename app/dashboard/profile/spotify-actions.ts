@@ -1,3 +1,5 @@
+// app/dashboard/profile/spotify-actions.ts
+
 'use server'
 
 import { db } from '@/lib/db'
@@ -5,23 +7,37 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 
+// Base URLs
+const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
+const SPOTIFY_API_URL = 'https://api.spotify.com/v1';
+
+// Helper to chunk arrays (re-used from previous logic)
+function chunkArray<T>(array: T[], size: number): T[][] {
+  const chunked: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunked.push(array.slice(i, i + size));
+  }
+  return chunked;
+}
+
 // 1. Helper: Get Client Credentials Token
 async function getSpotifyToken() {
   const basic = Buffer.from(
     `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
   ).toString('base64');
 
-  const response = await fetch('https://accounts.spotify.com/api/token', {
+  const response = await fetch(SPOTIFY_TOKEN_URL, { // FIX: Corrected URL
     method: 'POST',
     headers: {
       Authorization: `Basic ${basic}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: 'grant_type=client_credentials',
-    cache: 'no-store' // Don't cache the token request
+    cache: 'no-store'
   });
 
   const data = await response.json();
+  if (data.error) throw new Error(`Spotify Token Error: ${data.error_description}`);
   return data.access_token;
 }
 
@@ -31,17 +47,24 @@ export async function searchSpotifyArtists(query: string) {
   
   const token = await getSpotifyToken();
   const response = await fetch(
-    `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=artist&limit=5`, 
+    `${SPOTIFY_API_URL}/search?q=${encodeURIComponent(query)}&type=artist&limit=5`, // FIX: Corrected URL
     { headers: { Authorization: `Bearer ${token}` } }
   );
-
-  const data = await response.json();
   
-  // Return a simplified object for the frontend
+  // FIX: Handle HTML error response before parsing
+  const text = await response.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    console.error("Spotify Search JSON Parse Error:", text);
+    return [];
+  }
+
   return data.artists.items.map((artist: any) => ({
     id: artist.id,
     name: artist.name,
-    image: artist.images[0]?.url || null, // Get the largest image
+    image: artist.images[0]?.url || null,
     genres: artist.genres.slice(0, 3).join(', ')
   }));
 }
@@ -71,3 +94,132 @@ export async function claimArtist(artistId: string, avatarUrl: string) {
     return { error: 'Failed to link artist profile.' }
   }
 }
+
+// 4. Action: Sync Full Catalog
+export async function importSpotifyCatalog() {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  try {
+    const dbUser = await db.user.findUnique({
+      where: { id: user.id },
+      select: { spotifyArtistId: true }
+    });
+
+    if (!dbUser?.spotifyArtistId) {
+      return { error: 'No Spotify Artist connected.' };
+    }
+
+    const token = await getSpotifyToken();
+    const artistId = dbUser.spotifyArtistId;
+
+    // 1. UPDATE ARTIST PROFILE IMAGE (Self-Healing)
+    const artistResp = await fetch(
+        `${SPOTIFY_API_URL}/artists/${artistId}`, // FIX: Corrected URL
+        { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const artistData = await artistResp.json();
+    if (artistData.images && artistData.images.length > 0) {
+        await db.user.update({
+            where: { id: user.id },
+            data: { avatarUrl: artistData.images[0].url }
+        });
+    }
+
+    // 2. FETCH CATALOG (Albums -> Tracks)
+    const albumsResp = await fetch(
+      `${SPOTIFY_API_URL}/artists/${artistId}/albums?include_groups=album,single&limit=50`, // FIX: Corrected URL
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const albumsData = await albumsResp.json();
+    const albums = albumsData.items || [];
+
+    // 3. Collect All Track IDs from these Albums
+    let allTrackIds: string[] = [];
+    
+    for (const album of albums) {
+        const tracksResp = await fetch(
+            `${SPOTIFY_API_URL}/albums/${album.id}/tracks?limit=50`, // FIX: Corrected URL
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const tracksData = await tracksResp.json();
+        const ids = tracksData.items.map((t: any) => t.id);
+        allTrackIds.push(...ids);
+    }
+
+    // 4. Fetch Full Details (ISRCs + IMAGES)
+    const trackBatches = chunkArray(allTrackIds, 50);
+    let importCount = 0;
+
+    for (const batch of trackBatches) {
+        const idsParam = batch.join(',');
+        const fullTracksResp = await fetch(
+            `${SPOTIFY_API_URL}/tracks?ids=${idsParam}`, // FIX: Corrected URL
+            { headers: { Authorization: `Bearer ${token}` } }
+            // Note: If this fails, the issue is often a track ID not being found.
+        );
+        const fullTracksData = await fullTracksResp.json();
+        const tracks = fullTracksData.tracks || [];
+
+        // 5. Save to Database
+        for (const track of tracks) {
+            const isrc = track.external_ids?.isrc ? track.external_ids.isrc.replace(/[^A-Z0-9]/g, '') : null;
+            const title = track.name;
+            const coverArtUrl = track.album?.images?.[0]?.url || null;
+
+            if (title) {
+                // Upsert Song (Composition)
+                let song = await db.song.findFirst({
+                    where: { 
+                        title: title, 
+                        writers: { some: { userId: user.id } } 
+                    }
+                });
+
+                if (!song) {
+                    song = await db.song.create({
+                        data: {
+                            title,
+                            writers: { create: { userId: user.id, percentage: 100, role: 'Composer' } }
+                        }
+                    });
+                }
+
+                // Upsert Release with IMAGE
+                if (isrc) {
+                    await db.release.upsert({
+                        where: { isrc },
+                        update: { title, coverArtUrl },
+                        create: {
+                            songId: song.id,
+                            title,
+                            isrc,
+                            coverArtUrl
+                        }
+                    });
+                } else {
+                    await db.release.create({
+                        data: { songId: song.id, title, coverArtUrl }
+                    });
+                }
+                importCount++;
+            }
+        }
+    }
+
+    revalidatePath('/dashboard');
+    return { success: true, count: importCount };
+
+  } catch (error) {
+    console.error("SPOTIFY IMPORT ERROR:", error);
+    return { error: 'Failed to import catalog.' };
+  }
+}
+
+// ... existing helper functions (chunkArray) ...

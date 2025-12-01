@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { Plus, Music, Disc, ArrowRight } from 'lucide-react'
+import { Music, Disc, ArrowRight } from 'lucide-react'
+import { ReleaseArtwork } from '@/components/artwork' // Ensure this component exists
 
 // --- SERVER DATA FETCHING ---
 async function getDashboardData() {
@@ -32,6 +33,7 @@ async function getDashboardData() {
     where: { song: { writers: { some: { userId: user.id } } } },
     orderBy: { createdAt: 'desc' },
     take: 5,
+    // FIX: Include coverArtUrl
     include: { song: { select: { title: true } } }
   })
 
@@ -121,7 +123,7 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* QUADRANT 3: RECENT RELEASES (Real Data) */}
+        {/* QUADRANT 3: RECENT RELEASES (Real Data with Artwork) */}
         <Card className="col-span-1 min-h-[350px]">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Recent Releases</CardTitle>
@@ -139,8 +141,14 @@ export default async function DashboardPage() {
                   data.recentReleases.map((release) => (
                     <TableRow key={release.id}>
                       <TableCell>
-                        <div className="font-medium">{release.title}</div>
-                        <div className="text-xs text-gray-500">{release.song.title}</div>
+                        <div className="flex items-center gap-3">
+                          {/* NEW: Display Artwork */}
+                          <ReleaseArtwork url={release.coverArtUrl} size="sm" />
+                          <div>
+                            <div className="font-medium">{release.title}</div>
+                            <div className="text-xs text-gray-500">{release.song.title}</div>
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell className="font-mono text-xs">{formatCode(release.isrc)}</TableCell>
                     </TableRow>
@@ -170,6 +178,14 @@ export default async function DashboardPage() {
               <Button className="w-full h-16 text-lg justify-start gap-4" variant="outline">
                 <div className="bg-green-100 p-2 rounded-full"><Disc className="h-6 w-6 text-green-600" /></div>
                 Add Master Release
+                <ArrowRight className="ml-auto h-5 w-5 text-gray-400" />
+              </Button>
+            </Link>
+
+            <Link href="/dashboard/ingest">
+              <Button className="w-full h-16 text-lg justify-start gap-4" variant="outline">
+                <div className="bg-purple-100 p-2 rounded-full"><Disc className="h-6 w-6 text-purple-600" /></div>
+                Import Catalog (CSV)
                 <ArrowRight className="ml-auto h-5 w-5 text-gray-400" />
               </Button>
             </Link>

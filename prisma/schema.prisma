@@ -52,6 +52,9 @@ model Release {
   upc          String?       @unique
   isrc         String?       @unique
   title        String
+  
+  coverArtUrl  String?       // NEW FIELD
+  
   masterOwners MasterSplit[]
   createdAt    DateTime      @default(now())
 }
