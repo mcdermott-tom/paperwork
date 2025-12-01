@@ -78,7 +78,7 @@ export default async function ReleasesListPage() {
                   <TableRow key={release.id}>
                     <TableCell>
                       <div className="flex items-center gap-4">
-                        <ReleaseArtwork url={release.coverArtUrl} size="sm" />
+                        <ReleaseArtwork url={release.coverArtUrl} size="md" />
                         <div>
                           <div className="font-medium">{release.title}</div>
                           <div className="text-xs text-gray-500">{release.song.title}</div>

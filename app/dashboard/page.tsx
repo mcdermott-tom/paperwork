@@ -143,7 +143,7 @@ export default async function DashboardPage() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           {/* NEW: Display Artwork */}
-                          <ReleaseArtwork url={release.coverArtUrl} size="sm" />
+                          <ReleaseArtwork url={release.coverArtUrl} size="md" />
                           <div>
                             <div className="font-medium">{release.title}</div>
                             <div className="text-xs text-gray-500">{release.song.title}</div>

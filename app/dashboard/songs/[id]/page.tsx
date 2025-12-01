@@ -1,104 +1,151 @@
-// app/dashboard/songs/[id]/page.tsx
-
 import { db } from '@/lib/db'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import {
-    SongMetadataForm,
-    DeleteSongButton,
-    ReleasesTable,
-    WritersTable
+import { Button } from '@/components/ui/button'
+import { Disc, Music2, Plus } from 'lucide-react'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
+// Client Components
+import { 
+    SongMetadataForm, 
+    DeleteSongButton, 
+    ReleasesTable, 
+    WritersTable 
 } from './detail-client'
 
-// HELPER: Formats raw DB string (T1234567890) to Human Readable
+import { ReleaseArtwork } from '@/components/artwork'
+
+// HELPER: Formats raw DB string
 const formatISWC = (iswc: string | null | undefined) => {
   if (!iswc || iswc.length !== 11 || iswc[0] !== 'T') return iswc;
   return `${iswc[0]}-${iswc.slice(1, 4)}.${iswc.slice(4, 7)}.${iswc.slice(7, 10)}-${iswc[10]}`;
 };
 
-// --- SERVER COMPONENT ---
+// --- DATA FETCHING ---
+async function getSongData(songId: string) {
+  if (!songId) return null;
 
-async function getSongDetails(id: string | undefined) {
-  if (!id) return null; 
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
   
-  return await db.song.findUnique({
-    where: { id },
+  if (!user) return null
+
+  // Fetch Data
+  const song = await db.song.findUnique({
+    where: { id: songId },
     include: {
-      releases: true,
-      writers: { include: { user: true } }
+      writers: { 
+        where: { songId: songId },
+        include: { user: { select: { name: true, email: true } } } 
+      },
+      releases: {
+        select: { id: true, title: true, isrc: true, coverArtUrl: true } 
+      }
     }
   })
+
+  if (!song) return null
+  return song
 }
 
+// --- MAIN PAGE COMPONENT ---
 export default async function SongDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const song = await getSongDetails(id)
+  const song = await getSongData(id)
 
   if (!song) return (
     <div className="container mx-auto p-6 space-y-8">
         <h1 className="text-3xl font-bold text-red-600">Error: Song Not Found</h1>
-        <p>Please check the link or ensure the song exists in your list.</p>
         <Link href="/dashboard/songs">
             <Button variant="outline">Back to Song List</Button>
         </Link>
     </div>
-  ); 
+  );
 
-  // 1. Format Data for Display
-  const displayISWC = formatISWC(song.iswc);
+  const writersForClient = song.writers.map(writer => ({
+    ...writer,
+    percentage: writer.percentage.toNumber(), 
+  }));
 
-  // 2. Format Writers for Client (Decimal -> Number)
-const writersForClient = song.writers.map(writer => ({
-  ...writer,
-  percentage: writer.percentage.toNumber(),
-  email: writer.email, // Pass the raw email field
-}));
-
-  // 3. FIX: Create a "Clean" object for the Metadata Form
-  // We explicitly pick only the fields needed, ensuring 'writers' (with decimals) are NOT passed.
   const songMetadata = {
     id: song.id,
     title: song.title,
     iswc: song.iswc
-  };
+  }
+
+  const featuredCoverArtUrl = song.releases.find(r => r.coverArtUrl)?.coverArtUrl || null;
+  const displayISWC = formatISWC(song.iswc);
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
+    <div className="container mx-auto p-6 space-y-6">
+      
       {/* HEADER */}
-      <div className="flex justify-between items-start border-b pb-4">
+      <div className="flex items-start justify-between border-b pb-4">
         <div>
           <h1 className="text-3xl font-bold">{song.title}</h1>
-          <p className="text-gray-500 mt-1">ISWC: {displayISWC || 'Not Registered'}</p>
+          <p className="text-gray-500 flex items-center gap-2 mt-1">
+            <Music2 className="h-4 w-4" /> 
+            ISWC: {displayISWC || 'Not Registered'}
+          </p>
         </div>
         <DeleteSongButton songId={song.id} songTitle={song.title} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* COLUMN 1: METADATA EDIT FORM */}
-        <div className="md:col-span-1">
-          {/* FIX: Pass the clean 'songMetadata' object instead of the full 'song' */}
+        {/* COLUMN 1: METADATA FORM */}
+        <div className="lg:col-span-1">
           <SongMetadataForm initialData={songMetadata} songId={song.id} />
         </div>
 
-        {/* COLUMN 2: RELEASES LIST */}
-        <div className="md:col-span-2">
-          <h2 className="text-xl font-semibold mb-4">Releases (Masters)</h2>
-          <Card>
-            <CardContent className="p-0">
-              <ReleasesTable releases={song.releases} />
-            </CardContent>
-          </Card>
-        </div>
+        {/* COLUMN 2 & 3: MAIN CONTENT */}
+        <div className="lg:col-span-2 space-y-8">
+          
+          {/* 1. RELEASES (MASTERS) - ON TOP */}
+          <section>
+            <div className="flex justify-between items-start mb-4">
+                <div>
+                    <h2 className="text-xl font-bold">Releases (Masters)</h2>
+                    <p className="text-sm text-gray-500">Recordings linked to this composition.</p>
+                </div>
+                
+                {featuredCoverArtUrl ? (
+                  <div className="shadow-md rounded-md overflow-hidden border border-gray-200">
+                    <ReleaseArtwork url={featuredCoverArtUrl} size="lg" /> 
+                  </div>
+                ) : (
+                  <div className="h-16 w-16 bg-gray-50 border border-gray-200 rounded-md flex items-center justify-center">
+                    <Disc className="h-8 w-8 text-gray-300" />
+                  </div>
+                )}
+            </div>
 
-        {/* COLUMN 3: WRITERS LIST */}
-        <div className="md:col-span-3">
-          <h2 className="text-xl font-semibold mb-4">Writers (Composition)</h2>
-          
-          {/* UPDATE: Pass songId here! */}
-          <WritersTable writers={writersForClient} songId={song.id} />
-          
+            <Card>
+                <CardContent className="p-0">
+                <ReleasesTable releases={song.releases} />
+                </CardContent>
+            </Card>
+            
+            <Link href={`/dashboard/releases/new?songId=${song.id}`}>
+                <Button variant="outline" className="w-full gap-2 mt-4">
+                <Plus className="h-4 w-4" /> Create New Master Release
+                </Button>
+            </Link>
+          </section>
+
+          {/* 2. WRITERS (SPLITS) - IN MIDDLE */}
+          <section>
+             <h2 className="text-xl font-bold mb-4">Writers (Composition)</h2>
+             {/* This component now handles the Splits Table AND the Chart below it */}
+             <WritersTable writers={writersForClient} songId={song.id} />
+          </section>
+
         </div>
       </div>
     </div>
