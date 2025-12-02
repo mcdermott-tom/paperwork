@@ -6,7 +6,7 @@ import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { Resend } from 'resend' 
-import { createAuditLog } from '@/lib/logger'; // Assumed function
+import { createAuditLog } from '@/lib/logger'; 
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -22,6 +22,12 @@ async function getUserId() {
   return user?.id
 }
 
+// NEW HELPER: Checks if the Song is locked
+async function checkSongLock(songId: string) {
+    const song = await db.song.findUnique({ where: { id: songId }, select: { isLocked: true } });
+    return song?.isLocked ?? false;
+}
+
 // HELPER: Strips non-alphanumeric characters for clean DB storage
 const sanitizeISWC = (iswc: string | null | undefined) => {
     if (!iswc) return null;
@@ -29,7 +35,6 @@ const sanitizeISWC = (iswc: string | null | undefined) => {
     return cleaned || null;
 };
 
-// HELPER: Sanitize ISRC
 const sanitizeISRC = (isrc: string | null | undefined) => {
     if (!isrc) return null;
     return isrc.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -61,14 +66,13 @@ export async function createSong(formData: FormData) {
       }
     })
     
-    // LOG: Log the creation
     await createAuditLog({
         userId: userId,
         action: 'SONG_CREATED',
         entity: 'Song',
         entityId: newSong.id,
-        newData: newSong, // Pass the created object
-        oldData: undefined, // Explicitly use undefined for no old data
+        newData: newSong,
+        oldData: undefined,
     });
 
   } catch (error) {
@@ -89,8 +93,11 @@ export async function updateSongMetadata(formData: FormData) {
   const iswc = formData.get('iswc') as string
   const iswcClean = sanitizeISWC(iswc); 
 
+  // GUARD: Check if Song is Locked
+  const isLocked = await checkSongLock(id);
+  if (isLocked) return { error: 'Song is locked. Create a new version to make changes.' };
+
   try {
-    // 1. Fetch current state for oldData log
     const oldSong = await db.song.findUnique({ where: { id } });
 
     const newSong = await db.song.update({
@@ -101,7 +108,6 @@ export async function updateSongMetadata(formData: FormData) {
       }
     })
     
-    // 2. Log the update
     await createAuditLog({
         userId: userId,
         action: 'METADATA_UPDATED',
@@ -123,10 +129,14 @@ export async function deleteSong(id: string) {
   const userId = await getUserId()
   if (!userId) throw new Error('Unauthorized')
 
+  // GUARD: Check if Song is Locked
+  const isLocked = await checkSongLock(id);
+  if (isLocked) return { error: 'Song is locked. Cannot be deleted.' };
+
+
   try {
     const deletedSong = await db.song.delete({ where: { id } });
     
-    // LOG: Log the deletion
     await createAuditLog({
         userId: userId,
         action: 'SONG_DELETED',
@@ -145,7 +155,7 @@ export async function deleteSong(id: string) {
 }
 
 
-// --- WRITER / SPLIT ACTIONS (UPDATED) ---
+// --- WRITER / SPLIT ACTIONS ---
 
 export async function addWriter(formData: FormData) {
   const userId = await getUserId()
@@ -155,9 +165,13 @@ export async function addWriter(formData: FormData) {
   const email = formData.get('email') as string
   const role = formData.get('role') as string
   const percentage = parseFloat(formData.get('percentage') as string)
+  
+  // GUARD: Check if Song is Locked
+  const isLocked = await checkSongLock(songId);
+  if (isLocked) return { error: 'Song is locked. Cannot add writers.' };
+
 
   try {
-    // 1. Fetch Context
     const [song, inviter] = await Promise.all([
         db.song.findUnique({ where: { id: songId }, select: { title: true } }),
         db.user.findUnique({ where: { id: userId }, select: { name: true, email: true } })
@@ -165,10 +179,8 @@ export async function addWriter(formData: FormData) {
 
     if (!song) return { error: 'Song not found.' }
 
-    // 2. Check Database for User
     const writerUser = await db.user.findUnique({ where: { email } })
 
-    // 3. Prevent Duplicate Logic
     if (writerUser) {
       const existingSplit = await db.writerSplit.findFirst({
         where: { songId, userId: writerUser.id }
@@ -176,7 +188,6 @@ export async function addWriter(formData: FormData) {
       if (existingSplit) return { error: 'This user is already a writer on this song.' }
     }
 
-    // 4. Create the split
     const newSplit = await db.writerSplit.create({
       data: {
         songId,
@@ -187,7 +198,6 @@ export async function addWriter(formData: FormData) {
       }
     })
     
-    // 5. Log the action
     await createAuditLog({
         userId: userId,
         action: 'SPLIT_ADDED',
@@ -197,31 +207,26 @@ export async function addWriter(formData: FormData) {
         oldData: undefined,
     });
 
-    // 6. SAFELY SEND EMAIL (Non-fatal)
     try {
         const apiKey = process.env.RESEND_API_KEY;
-        if (apiKey) {
+        if (apiKey && !writerUser) {
             const artistName = inviter?.name || inviter?.email || "A collaborator";
             const inviteLink = "http://localhost:3000/login";
 
-            if (!writerUser) {
-                await resend.emails.send({
-                    from: 'Paperwork <onboarding@resend.dev>',
-                    to: email,
-                    subject: `Royalty Invite: "${song.title}"`,
-                    html: `
-                      <div style="font-family: sans-serif; font-size: 16px; color: #333;">
-                        <h1>You have pending royalties!</h1>
-                        <p><strong>${artistName}</strong> has added you as a <strong>${role}</strong> on the song <strong>"${song.title}"</strong>.</p>
-                        <p>You have been assigned <strong>${percentage}%</strong> ownership.</p>
-                        <br/>
-                        <a href="${inviteLink}" style="background-color: #000; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Accept Royalties & Sign Up</a>
-                      </div>
-                    `
-                });
-            }
-        } else {
-            console.warn("Resend API Key missing - skipping email.");
+            await resend.emails.send({
+                from: 'Paperwork <onboarding@resend.dev>',
+                to: email,
+                subject: `Royalty Invite: "${song.title}"`,
+                html: `
+                  <div style="font-family: sans-serif; font-size: 16px; color: #333;">
+                    <h1>You have pending royalties!</h1>
+                    <p><strong>${artistName}</strong> has added you as a <strong>${role}</strong> on the song <strong>"${song.title}"</strong>.</p>
+                    <p>You have been assigned <strong>${percentage}%</strong> ownership.</p>
+                    <br/>
+                    <a href="${inviteLink}" style="background-color: #000; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Accept Royalties & Sign Up</a>
+                  </div>
+                `
+            });
         }
     } catch (emailError) {
         console.error("EMAIL SEND FAILED (Non-fatal):", emailError);
@@ -244,18 +249,19 @@ export async function updateSplit(formData: FormData) {
   const songId = formData.get('songId') as string
   const role = formData.get('role') as string
   const percentage = parseFloat(formData.get('percentage') as string)
+  
+  // GUARD: Check if Song is Locked
+  const isLocked = await checkSongLock(songId);
+  if (isLocked) return { error: 'Song is locked. Cannot update splits.' };
 
   try {
-    // 1. Fetch old data before update
     const oldSplit = await db.writerSplit.findUnique({ where: { id: splitId } });
 
-    // 2. Perform Update
     const newSplit = await db.writerSplit.update({
       where: { id: splitId },
       data: { role, percentage }
     })
 
-    // 3. Log the change
     await createAuditLog({
         userId: userId,
         action: 'SPLIT_UPDATED',
@@ -275,11 +281,15 @@ export async function updateSplit(formData: FormData) {
 export async function deleteSplit(splitId: string, songId: string) {
   const userId = await getUserId()
   if (!userId) return { error: 'Unauthorized' }
+  
+  // GUARD: Check if Song is Locked
+  const isLocked = await checkSongLock(songId);
+  if (isLocked) return { error: 'Song is locked. Cannot delete splits.' };
+
 
   try {
     const deletedSplit = await db.writerSplit.delete({ where: { id: splitId } })
     
-    // Log the deletion
     await createAuditLog({
         userId: userId,
         action: 'SPLIT_DELETED',
@@ -298,6 +308,7 @@ export async function deleteSplit(splitId: string, songId: string) {
 
 
 // --- RELEASE ACTIONS ---
+// (No lock check needed here since Release metadata is considered secondary to the composition contract)
 
 export async function createRelease(formData: FormData) {
   const userId = await getUserId()
@@ -316,7 +327,6 @@ export async function createRelease(formData: FormData) {
       }
     })
     
-    // Log the creation
     await createAuditLog({
         userId: userId,
         action: 'RELEASE_CREATED',
@@ -354,7 +364,6 @@ export async function updateRelease(formData: FormData) {
       }
     })
     
-    // Log the update
     await createAuditLog({
         userId: userId,
         action: 'RELEASE_UPDATED',
@@ -379,7 +388,6 @@ export async function deleteRelease(id: string, songId: string) {
   try {
     const deletedRelease = await db.release.delete({ where: { id } })
     
-    // Log the deletion
     await createAuditLog({
         userId: userId,
         action: 'RELEASE_DELETED',

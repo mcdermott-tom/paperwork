@@ -43,6 +43,7 @@ model Song {
   releases           Release[]
   cwrFileGeneratedAt DateTime?
   createdAt          DateTime      @default(now())
+  isLocked      Boolean   @default(false)  // <--- IS THIS LINE HERE?
 }
 
 model Release {
