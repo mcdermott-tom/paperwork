@@ -3,9 +3,9 @@ import { db } from '@/lib/db'
 import { headers } from 'next/headers'
 
 // Helper to get the user's IP (via Vercel/Next.js headers)
-function getIpAddress() {
-    // FIX: Cast the result of headers() to bypass the erroneous Promise type error
-    const headersList = headers() as any; 
+async function getIpAddress() {
+    // FIX: You must await headers() in Next.js 15+
+    const headersList = await headers();
     
     // Vercel standard header for real IP
     return headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'Unknown';
@@ -21,7 +21,8 @@ interface LogData {
 }
 
 export async function createAuditLog({ userId, action, entity, entityId, oldData, newData }: LogData) {
-    const ipAddress = getIpAddress();
+    // FIX: Await the async IP helper
+    const ipAddress = await getIpAddress();
     
     await db.auditLog.create({
         data: {

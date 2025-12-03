@@ -44,6 +44,7 @@ model Song {
   cwrFileGeneratedAt DateTime?
   createdAt          DateTime      @default(now())
   isLocked      Boolean   @default(false)  // <--- IS THIS LINE HERE?
+  splitSheets   SplitSheet[]
 }
 
 model Release {
@@ -86,11 +87,18 @@ model MasterSplit {
 }
 
 model SplitSheet {
-  id            String  @id @default(uuid())
-  songId        String
-  status        String  // "DRAFT", "SIGNED", "ACTIVE"
-  pdfUrl        String?
-  signatureHash String?
+  id             String   @id @default(uuid())
+  
+  // This is the "Opposite Relation" the error is asking for:
+  songId         String
+  song           Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  
+  pdfUrl         String
+  signedByUserId String
+  signedAt       DateTime @default(now())
+  signedIp       String?
+  userAgent      String?
+  version        Int      @default(1)
 }
 
 

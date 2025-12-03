@@ -1,3 +1,5 @@
+// app/dashboard/songs/[id]/page.tsx
+
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
@@ -5,7 +7,11 @@ import { Button } from '@/components/ui/button'
 import { Disc, Music2, Plus } from 'lucide-react'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+
+// Action Buttons
 import { DownloadSplitSheetButton } from './pdf-button'
+import { ExportCWRButton } from './export-button'
+import { SignContractButton } from './sign-button' // NEW IMPORT
 
 // Client Components
 import { 
@@ -47,6 +53,11 @@ async function getSongData(songId: string) {
       },
       releases: {
         select: { id: true, title: true, isrc: true, coverArtUrl: true } 
+      },
+      // UPDATE: Fetch split sheets to check signature status
+      splitSheets: {
+        orderBy: { signedAt: 'desc' },
+        take: 1
       }
     }
   })
@@ -82,6 +93,9 @@ export default async function SongDetailPage({ params }: { params: Promise<{ id:
 
   const featuredCoverArtUrl = song.releases.find(r => r.coverArtUrl)?.coverArtUrl || null;
   const displayISWC = formatISWC(song.iswc);
+  
+  // Check if signed
+  const hasSigned = song.splitSheets.length > 0;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -108,7 +122,7 @@ export default async function SongDetailPage({ params }: { params: Promise<{ id:
         {/* COLUMN 2 & 3: MAIN CONTENT */}
         <div className="lg:col-span-2 space-y-8">
           
-          {/* 1. RELEASES (MASTERS) - ON TOP */}
+          {/* 1. RELEASES (MASTERS) */}
           <section>
             <div className="flex justify-between items-start mb-4">
                 <div>
@@ -140,13 +154,17 @@ export default async function SongDetailPage({ params }: { params: Promise<{ id:
             </Link>
           </section>
 
-          {/* 2. WRITERS (SPLITS) - IN MIDDLE */}
+          {/* 2. WRITERS (SPLITS) */}
           <section>
-             <div className="flex justify-between items-center mb-4">
+             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
                <h2 className="text-xl font-bold">Writers (Composition)</h2>
                
-               {/* NEW: Download Button */}
-               <DownloadSplitSheetButton song={songMetadata} writers={writersForClient} />
+               {/* TOOLBAR: Download, Export, Sign */}
+               <div className="flex gap-2">
+                  <DownloadSplitSheetButton song={songMetadata} writers={writersForClient} />
+                  <ExportCWRButton songId={song.id} />
+                  <SignContractButton songId={song.id} hasSigned={hasSigned} />
+               </div>
              </div>
              
              <WritersTable writers={writersForClient} songId={song.id} />
