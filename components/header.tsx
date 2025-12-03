@@ -82,6 +82,11 @@ export function Header() {
       {/* Right: Navigation & Profile */}
       <div className="flex items-center gap-6">
         <nav className="flex items-center gap-4 text-sm font-medium">
+          <Link href="/dashboard/placements" className="text-sm font-medium hover:text-black text-gray-500">
+            Placements
+          </Link>
+
+
           <DropdownMenu>
             <DropdownMenuTrigger className="hover:text-gray-600 transition-colors">Releases ▾</DropdownMenuTrigger>
             <DropdownMenuContent>

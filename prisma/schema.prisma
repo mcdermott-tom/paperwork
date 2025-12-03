@@ -45,6 +45,7 @@ model Song {
   createdAt          DateTime      @default(now())
   isLocked      Boolean   @default(false)  // <--- IS THIS LINE HERE?
   splitSheets   SplitSheet[]
+  placements Placement[] // Add this line
 }
 
 model Release {
@@ -113,4 +114,28 @@ model AuditLog {
   newData   Json?    // Optional: stores the state after the change
   ipAddress String?  // IP address of the requester (CRITICAL for legal evidence)
   createdAt DateTime @default(now())
+}
+
+
+model Placement {
+  id          String   @id @default(uuid())
+  songId      String
+  song        Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  
+  client      String
+  project     String?
+  licenseType String
+  
+  // 1. The Upfront Money
+  fee         Decimal  @db.Decimal(10, 2)
+  currency    String   @default("USD")
+  feeStatus   String   @default("pending") // "pending", "invoiced", "paid"
+  
+  // 2. The Backend (BMI/ASCAP)
+  proStatus   String   @default("todo")    // "todo", "submitted", "confirmed"
+  
+  notes       String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
