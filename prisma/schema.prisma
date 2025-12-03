@@ -36,16 +36,21 @@ model Account {
 }
 
 model Song {
-  id                 String        @id @default(uuid())
-  title              String
-  iswc               String?       @unique
-  writers            WriterSplit[]
-  releases           Release[]
-  cwrFileGeneratedAt DateTime?
-  createdAt          DateTime      @default(now())
-  isLocked      Boolean   @default(false)  // <--- IS THIS LINE HERE?
+  id            String        @id @default(uuid())
+  title         String
+  iswc          String?       @unique
+  isLocked      Boolean       @default(false)
+  
+  // NEW: Track where this data came from
+  importSource  String?       // e.g. "spotify", "csv", "manual"
+  
+  writers       WriterSplit[]
+  releases      Release[]
   splitSheets   SplitSheet[]
-  placements Placement[] // Add this line
+  placements    Placement[]   // Ensure this exists from previous steps
+  
+  createdAt     DateTime      @default(now())
+  cwrFileGeneratedAt DateTime?
 }
 
 model Release {

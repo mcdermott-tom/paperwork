@@ -9,7 +9,6 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   
-  /* Sidebar Variables */
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -19,14 +18,12 @@
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
   
-  /* Chart Variables */
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
   
-  /* Core UI Variables */
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -44,99 +41,113 @@
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   
-  /* Radius */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* THEME: GALLERY ADMIN (High Contrast, Professional) */
+/* THEME: OCEANIC ADMIN */
 :root {
-  --radius: 0.3rem; /* Tighter corners for pro feel */
+  --radius: 0.5rem;
 
-  /* Pure White Backgrounds */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.12 0 0); /* Almost black text, sharp contrast */
+  /* Base: White */
+  --background: #ffffff;
+  --foreground: #022b3a; /* Deep Navy Text */
 
-  /* Crisp Cards */
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.12 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.12 0 0);
+  /* Cards: Subtle Off-White/Blue Tint */
+  --card: #e1e5f2; 
+  --card-foreground: #022b3a;
+  --popover: #ffffff;
+  --popover-foreground: #022b3a;
 
-  /* HYPER-BLUE PRIMARY (Trust + Tech) */
-  --primary: oklch(0.55 0.22 260); /* Vibrant Electric Blue */
-  --primary-foreground: oklch(1 0 0);
+  /* Primary: Teal Blue (#1f7a8c) */
+  --primary: #1f7a8c;
+  --primary-foreground: #ffffff;
 
-  /* Subtle but Sharp Borders */
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.25 0 0);
-  
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.55 0 0);
-  
-  --accent: oklch(0.96 0 0);
-  --accent-foreground: oklch(0.25 0 0);
-  
-  --destructive: oklch(0.57 0.2 27);
-  --destructive-foreground: oklch(0.98 0 0);
+  /* Secondary: Soft Blue (#bfdbf7) */
+  --secondary: #bfdbf7;
+  --secondary-foreground: #022b3a;
 
-  /* Sharp Borders (No gray mush) */
-  --border: oklch(0.90 0 0);
-  --input: oklch(0.90 0 0);
-  --ring: oklch(0.55 0.22 260); /* Matches Primary */
+  /* Muted */
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
 
-  /* Charts (Updated to match the Blue theme) */
-  --chart-1: oklch(0.55 0.22 260); /* Primary Blue */
-  --chart-2: oklch(0.65 0.18 200); /* Cyan */
-  --chart-3: oklch(0.45 0.15 280); /* Purple */
-  --chart-4: oklch(0.85 0.1 85);   /* Warning Yellow/Orange */
-  --chart-5: oklch(0.7 0.15 30);   /* Danger Red */
+  /* Accent */
+  --accent: #e1e5f2;
+  --accent-foreground: #1f7a8c;
+
+  /* Semantic Colors (Restored Punch) */
+  --destructive: #ef4444; /* Standard Red */
+  --destructive-foreground: #ffffff;
+  /* (You can use tailwind classes like text-green-600 for success) */
+
+  /* Borders */
+  --border: #bfdbf7;
+  --input: #e1e5f2;
+  --ring: #1f7a8c;
+
+  /* Charts */
+  --chart-1: #022b3a; /* Deep Navy */
+  --chart-2: #1f7a8c; /* Teal */
+  --chart-3: #bfdbf7; /* Light Blue */
+  --chart-4: #eab308; /* Yellow */
+  --chart-5: #ef4444; /* Red */
 
   /* Sidebar */
-  --sidebar: oklch(0.99 0 0);
-  --sidebar-foreground: oklch(0.12 0 0);
-  --sidebar-primary: oklch(0.55 0.22 260);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.25 0 0);
-  --sidebar-border: oklch(0.90 0 0);
-  --sidebar-ring: oklch(0.55 0.22 260);
+  --sidebar: #ffffff;
+  --sidebar-foreground: #022b3a;
+  --sidebar-primary: #1f7a8c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e1e5f2;
+  --sidebar-accent-foreground: #022b3a;
+  --sidebar-border: #bfdbf7;
+  --sidebar-ring: #1f7a8c;
 }
 
 .dark {
-  --background: oklch(0.12 0 0);
-  --foreground: oklch(0.98 0 0);
-  --card: oklch(0.15 0 0);
-  --card-foreground: oklch(0.98 0 0);
-  --popover: oklch(0.15 0 0);
-  --popover-foreground: oklch(0.98 0 0);
-  --primary: oklch(0.6 0.2 260); /* Lighter Blue for Dark Mode */
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.2 0 0);
-  --secondary-foreground: oklch(0.98 0 0);
-  --muted: oklch(0.2 0 0);
-  --muted-foreground: oklch(0.7 0 0);
-  --accent: oklch(0.2 0 0);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.4 0.15 25);
-  --border: oklch(0.25 0 0);
-  --input: oklch(0.25 0 0);
-  --ring: oklch(0.6 0.2 260);
-  --chart-1: oklch(0.6 0.2 260);
-  --chart-2: oklch(0.7 0.15 200);
-  --chart-3: oklch(0.5 0.15 280);
-  --chart-4: oklch(0.8 0.1 85);
-  --chart-5: oklch(0.6 0.15 30);
-  --sidebar: oklch(0.15 0 0);
-  --sidebar-foreground: oklch(0.98 0 0);
-  --sidebar-primary: oklch(0.6 0.2 260);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.2 0 0);
-  --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(0.25 0 0);
-  --sidebar-ring: oklch(0.6 0.2 260);
+  /* Dark Mode Flip: Deep Navy Background */
+  --background: #022b3a;
+  --foreground: #e1e5f2;
+
+  --card: #1f2937; /* Darker Slate */
+  --card-foreground: #e1e5f2;
+  --popover: #022b3a;
+  --popover-foreground: #e1e5f2;
+
+  --primary: #bfdbf7; /* Light Blue for contrast on dark */
+  --primary-foreground: #022b3a;
+
+  --secondary: #1f7a8c; /* Teal */
+  --secondary-foreground: #ffffff;
+
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+
+  --accent: #1f7a8c;
+  --accent-foreground: #ffffff;
+
+  --destructive: #7f1d1d;
+  --destructive-foreground: #e1e5f2;
+
+  --border: #1f7a8c;
+  --input: #1f2937;
+  --ring: #bfdbf7;
+
+  --chart-1: #bfdbf7;
+  --chart-2: #1f7a8c;
+  --chart-3: #022b3a;
+  --chart-4: #eab308;
+  --chart-5: #ef4444;
+
+  --sidebar: #022b3a;
+  --sidebar-foreground: #e1e5f2;
+  --sidebar-primary: #bfdbf7;
+  --sidebar-primary-foreground: #022b3a;
+  --sidebar-accent: #1f7a8c;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #1f7a8c;
+  --sidebar-ring: #bfdbf7;
 }
 
 @layer base {

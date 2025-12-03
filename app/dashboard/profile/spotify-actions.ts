@@ -1,5 +1,3 @@
-// app/dashboard/profile/spotify-actions.ts
-
 'use server'
 
 import { db } from '@/lib/db'
@@ -8,10 +6,9 @@ import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 
 // Base URLs
-const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
-const SPOTIFY_API_URL = 'https://api.spotify.com/v1';
+const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token'; 
+const SPOTIFY_API_URL = 'https://api.spotify.com/v1'; 
 
-// Helper to chunk arrays (re-used from previous logic)
 function chunkArray<T>(array: T[], size: number): T[][] {
   const chunked: T[][] = [];
   for (let i = 0; i < array.length; i += size) {
@@ -26,7 +23,7 @@ async function getSpotifyToken() {
     `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
   ).toString('base64');
 
-  const response = await fetch(SPOTIFY_TOKEN_URL, { // FIX: Corrected URL
+  const response = await fetch(SPOTIFY_TOKEN_URL, {
     method: 'POST',
     headers: {
       Authorization: `Basic ${basic}`,
@@ -45,28 +42,26 @@ async function getSpotifyToken() {
 export async function searchSpotifyArtists(query: string) {
   if (!query) return [];
   
-  const token = await getSpotifyToken();
-  const response = await fetch(
-    `${SPOTIFY_API_URL}/search?q=${encodeURIComponent(query)}&type=artist&limit=5`, // FIX: Corrected URL
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  
-  // FIX: Handle HTML error response before parsing
-  const text = await response.text();
-  let data;
   try {
-    data = JSON.parse(text);
+    const token = await getSpotifyToken();
+    const response = await fetch(
+      `${SPOTIFY_API_URL}/search?q=${encodeURIComponent(query)}&type=artist&limit=5`, 
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    return data.artists.items.map((artist: any) => ({
+      id: artist.id,
+      name: artist.name,
+      image: artist.images[0]?.url || null,
+      genres: artist.genres.slice(0, 3).join(', ')
+    }));
   } catch (e) {
-    console.error("Spotify Search JSON Parse Error:", text);
+    console.error("Spotify Search Error:", e);
     return [];
   }
-
-  return data.artists.items.map((artist: any) => ({
-    id: artist.id,
-    name: artist.name,
-    image: artist.images[0]?.url || null,
-    genres: artist.genres.slice(0, 3).join(', ')
-  }));
 }
 
 // 3. Action: Claim Artist
@@ -95,7 +90,7 @@ export async function claimArtist(artistId: string, avatarUrl: string) {
   }
 }
 
-// 4. Action: Sync Full Catalog
+// 4. Action: Sync Full Catalog (SMARTER RE-LINKING)
 export async function importSpotifyCatalog() {
   const cookieStore = await cookies()
   const supabase = createServerClient(
@@ -119,9 +114,9 @@ export async function importSpotifyCatalog() {
     const token = await getSpotifyToken();
     const artistId = dbUser.spotifyArtistId;
 
-    // 1. UPDATE ARTIST PROFILE IMAGE (Self-Healing)
+    // 1. Update Profile Image
     const artistResp = await fetch(
-        `${SPOTIFY_API_URL}/artists/${artistId}`, // FIX: Corrected URL
+        `${SPOTIFY_API_URL}/artists/${artistId}`, 
         { headers: { Authorization: `Bearer ${token}` } }
     );
     const artistData = await artistResp.json();
@@ -132,20 +127,19 @@ export async function importSpotifyCatalog() {
         });
     }
 
-    // 2. FETCH CATALOG (Albums -> Tracks)
+    // 2. Fetch Catalog
     const albumsResp = await fetch(
-      `${SPOTIFY_API_URL}/artists/${artistId}/albums?include_groups=album,single&limit=50`, // FIX: Corrected URL
+      `${SPOTIFY_API_URL}/artists/${artistId}/albums?include_groups=album,single&limit=50`, 
       { headers: { Authorization: `Bearer ${token}` } }
     );
     const albumsData = await albumsResp.json();
     const albums = albumsData.items || [];
 
-    // 3. Collect All Track IDs from these Albums
     let allTrackIds: string[] = [];
     
     for (const album of albums) {
         const tracksResp = await fetch(
-            `${SPOTIFY_API_URL}/albums/${album.id}/tracks?limit=50`, // FIX: Corrected URL
+            `${SPOTIFY_API_URL}/albums/${album.id}/tracks?limit=50`, 
             { headers: { Authorization: `Bearer ${token}` } }
         );
         const tracksData = await tracksResp.json();
@@ -153,60 +147,107 @@ export async function importSpotifyCatalog() {
         allTrackIds.push(...ids);
     }
 
-    // 4. Fetch Full Details (ISRCs + IMAGES)
+    // 3. Process Tracks (Batch)
     const trackBatches = chunkArray(allTrackIds, 50);
     let importCount = 0;
 
     for (const batch of trackBatches) {
         const idsParam = batch.join(',');
         const fullTracksResp = await fetch(
-            `${SPOTIFY_API_URL}/tracks?ids=${idsParam}`, // FIX: Corrected URL
+            `${SPOTIFY_API_URL}/tracks?ids=${idsParam}`, 
             { headers: { Authorization: `Bearer ${token}` } }
-            // Note: If this fails, the issue is often a track ID not being found.
         );
         const fullTracksData = await fullTracksResp.json();
         const tracks = fullTracksData.tracks || [];
 
-        // 5. Save to Database
         for (const track of tracks) {
             const isrc = track.external_ids?.isrc ? track.external_ids.isrc.replace(/[^A-Z0-9]/g, '') : null;
             const title = track.name;
             const coverArtUrl = track.album?.images?.[0]?.url || null;
 
             if (title) {
-                // Upsert Song (Composition)
-                let song = await db.song.findFirst({
-                    where: { 
-                        title: title, 
-                        writers: { some: { userId: user.id } } 
-                    }
-                });
+                let songId = null;
 
-                if (!song) {
-                    song = await db.song.create({
+                // A. Check if this Release already exists by ISRC (Strongest Link)
+                if (isrc) {
+                    const existingRelease = await db.release.findUnique({
+                        where: { isrc },
+                        select: { songId: true }
+                    });
+                    if (existingRelease) {
+                        songId = existingRelease.songId; // Re-use the existing song
+                    }
+                }
+
+                // B. If no Release, try to find Song by Title + User (Legacy/Manual check)
+                if (!songId) {
+                    const existingSong = await db.song.findFirst({
+                        where: { 
+                            title: title, 
+                            writers: { some: { userId: user.id } } 
+                        },
+                        select: { id: true }
+                    });
+                    if (existingSong) songId = existingSong.id;
+                }
+
+                // C. If Song Found (via A or B) -> Ensure Link Exists
+                if (songId) {
+                    const split = await db.writerSplit.findFirst({
+                        where: { songId, userId: user.id }
+                    });
+                    
+                    // If no split (this is the "Re-Claim" magic), create it!
+                    if (!split) {
+                        await db.writerSplit.create({
+                            data: {
+                                songId,
+                                userId: user.id,
+                                percentage: 100,
+                                role: 'Composer'
+                            }
+                        });
+                    }
+                    
+                    // Tag it as spotify source
+                    await db.song.update({
+                        where: { id: songId },
+                        data: { importSource: 'spotify' }
+                    });
+                } else {
+                    // D. If Song Not Found -> Create New Song + Split
+                    const newSong = await db.song.create({
                         data: {
                             title,
+                            importSource: 'spotify',
                             writers: { create: { userId: user.id, percentage: 100, role: 'Composer' } }
                         }
                     });
+                    songId = newSong.id;
                 }
 
-                // Upsert Release with IMAGE
+                // E. Upsert Release (Update metadata or Create if new)
                 if (isrc) {
                     await db.release.upsert({
                         where: { isrc },
-                        update: { title, coverArtUrl },
+                        update: { title, coverArtUrl, songId }, // Ensure it points to the correct song
                         create: {
-                            songId: song.id,
+                            songId,
                             title,
                             isrc,
                             coverArtUrl
                         }
                     });
                 } else {
-                    await db.release.create({
-                        data: { songId: song.id, title, coverArtUrl }
+                    // Check duplicate for non-ISRC tracks to avoid spam
+                    const existingTitleRelease = await db.release.findFirst({
+                        where: { songId, title }
                     });
+                    if (!existingTitleRelease) {
+                        await db.release.create({
+                            data: { songId, title, coverArtUrl }
+                        });
+                    }
                 }
                 importCount++;
             }
@@ -214,6 +255,7 @@ export async function importSpotifyCatalog() {
     }
 
     revalidatePath('/dashboard');
+    revalidatePath('/dashboard/songs');
     return { success: true, count: importCount };
 
   } catch (error) {
@@ -222,4 +264,44 @@ export async function importSpotifyCatalog() {
   }
 }
 
-// ... existing helper functions (chunkArray) ...
+// 5. Action: Reset Spotify Connection
+export async function resetSpotifyConnection() {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  try {
+    // 1. Unlink the User Profile
+    await db.user.update({
+      where: { id: user.id },
+      data: {
+        spotifyArtistId: null,
+        avatarUrl: null,
+      }
+    })
+
+    // 2. Remove "WriterSplits" for Spotify-imported songs
+    await db.writerSplit.deleteMany({
+        where: {
+            userId: user.id,
+            song: {
+                importSource: 'spotify'
+            }
+        }
+    });
+
+    revalidatePath('/dashboard/profile')
+    revalidatePath('/dashboard/songs')
+    revalidatePath('/dashboard')
+    
+    return { success: true }
+  } catch (error) {
+    console.error("SPOTIFY RESET ERROR:", error);
+    return { error: 'Failed to reset Spotify connection.' }
+  }
+}

@@ -18,47 +18,25 @@ export function Header() {
   const router = useRouter()
   const supabase = createClient()
   const [mounted, setMounted] = useState(false)
-  
-  // NEW STATE: To hold the user's fetched profile image URL
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true)
-    // NEW: Fetch the user profile data client-side after mounting
     async function fetchUserAvatar() {
-        // We use the simpler supabase.auth.getUser() on the client for performance
         const { data: { user } } = await supabase.auth.getUser();
-
         if (user) {
-            // Since we updated avatarUrl in the public.User table (via server action), 
-            // we have to retrieve it from the server's endpoint. 
-            // The simplest path: Fetch the profile data again (assuming you pass a prop or use a custom hook).
-            
-            // However, since we stored the avatar in the User DB table:
             const { data: profile } = await supabase
-                .from('User') // Use the name of your table
+                .from('User')
                 .select('avatarUrl')
                 .eq('id', user.id)
                 .single()
-            
             if (profile && profile.avatarUrl) {
                 setAvatarUrl(profile.avatarUrl)
             }
         }
     }
     fetchUserAvatar();
-  }, [supabase]) // Dependency on supabase client
-
-  // Prevent hydration mismatch
-  if (!mounted) {
-    return (
-      <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b px-6 bg-white">
-        <div className="flex items-center">
-           <div className="h-6 w-[120px]" /> 
-        </div>
-      </header>
-    )
-  }
+  }, [supabase])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -66,29 +44,34 @@ export function Header() {
     router.refresh()
   }
 
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b px-6 bg-background">
+        <div className="flex items-center">
+           {/* Placeholder for text logo */}
+           <div className="h-6 w-24 bg-muted/50 rounded animate-pulse" /> 
+        </div>
+      </header>
+    )
+  }
+
   return (
-    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b px-6 bg-white">
-      {/* Left: Logo & Dashboard Link */}
-      <Link href="/dashboard" className="flex items-center">
-        <img 
-          src="/images/paperwork-logo.png" 
-          alt="Paperwork Logo" 
-          width={120} 
-          height={24}
-          className="h-6 w-auto" 
-        />
+    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b px-6 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 text-[#1f7a8c] dark:text-[#bfdbf7]">
+      
+      {/* Left: Text Logo */}
+      <Link href="/dashboard" className="flex items-center gap-2 transition-opacity hover:opacity-80">
+        <span className="text-xl font-bold tracking-tight font-sans">
+          Paperwork
+        </span>
       </Link>
 
       {/* Right: Navigation & Profile */}
       <div className="flex items-center gap-6">
         <nav className="flex items-center gap-4 text-sm font-medium">
-          <Link href="/dashboard/placements" className="text-sm font-medium hover:text-black text-gray-500">
-            Placements
-          </Link>
-
-
+          
           <DropdownMenu>
-            <DropdownMenuTrigger className="hover:text-gray-600 transition-colors">Releases ▾</DropdownMenuTrigger>
+            <DropdownMenuTrigger className="hover:text-primary transition-colors">Releases ▾</DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem><Link href="/dashboard/releases">View All</Link></DropdownMenuItem>
               <DropdownMenuItem><Link href="/dashboard/releases/new">New Release</Link></DropdownMenuItem>
@@ -96,21 +79,22 @@ export function Header() {
           </DropdownMenu>
 
           <DropdownMenu>
-            <DropdownMenuTrigger className="hover:text-gray-600 transition-colors">Songs ▾</DropdownMenuTrigger>
+            <DropdownMenuTrigger className="hover:text-primary transition-colors">Songs ▾</DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem><Link href="/dashboard/songs">View All</Link></DropdownMenuItem>
               <DropdownMenuItem><Link href="/dashboard/songs/new">New Song</Link></DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {/* Direct Link for Placements */}
+          <Link href="/dashboard/placements" className="hover:text-primary transition-colors">
+            Placements
+          </Link>
+
           <DropdownMenu>
-            <DropdownMenuTrigger className="hover:text-black transition-colors font-medium">Splits ▾</DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              {/* Link to the new page */}
-              <DropdownMenuItem asChild>
-                  <Link href="/dashboard/splits" className="cursor-pointer">My Splits</Link>
-              </DropdownMenuItem>
-              {/* You can add a filter later for "Pending" vs "Archive" */}
+            <DropdownMenuTrigger className="hover:text-primary transition-colors">Splits ▾</DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem><Link href="/dashboard/splits">My Splits</Link></DropdownMenuItem>
               <DropdownMenuItem disabled className="text-muted-foreground">Archive (Coming Soon)</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -119,17 +103,16 @@ export function Header() {
         {/* Profile Icon */}
         <DropdownMenu>
           <DropdownMenuTrigger>
-            <Avatar className="h-8 w-8 cursor-pointer">
-              {/* FIX: Use the fetched avatar URL */}
-              <AvatarImage src={avatarUrl || undefined} /> 
-              <AvatarFallback><User className="h-4 w-4" /></AvatarFallback>
+            <Avatar className="h-8 w-8 cursor-pointer border border-primary/20">
+              <AvatarImage src={avatarUrl || undefined} className="object-cover" /> 
+              <AvatarFallback className="bg-primary/10 text-primary"><User className="h-4 w-4" /></AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild>
               <Link href="/dashboard/profile" className="cursor-pointer w-full">Profile</Link>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer">
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive cursor-pointer focus:text-destructive">
               Log out
             </DropdownMenuItem>
           </DropdownMenuContent>

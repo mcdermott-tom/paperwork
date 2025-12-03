@@ -1,19 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { searchSpotifyArtists, claimArtist, importSpotifyCatalog } from './spotify-actions'
+import { searchSpotifyArtists, claimArtist, importSpotifyCatalog, resetSpotifyConnection } from './spotify-actions'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Search, CheckCircle, RefreshCw } from 'lucide-react'
+import { Search, CheckCircle, RefreshCw, XCircle } from 'lucide-react'
+import { toast } from 'sonner'
 
 // eslint-disable-next-line @next/next/no-img-element
 export function SpotifyConnect({ currentArtistId }: { currentArtistId?: string | null }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
-  
-  // New state for the sync process
   const [syncing, setSyncing] = useState(false)
 
   const handleSearch = async () => {
@@ -23,24 +22,59 @@ export function SpotifyConnect({ currentArtistId }: { currentArtistId?: string |
     setLoading(false)
   }
 
-  const handleClaim = async (artist: any) => {
-    if (confirm(`Is "${artist.name}" your artist profile?`)) {
-      await claimArtist(artist.id, artist.image)
-      alert("Profile connected!")
-      setResults([]) // Clear results on success
-    }
+  const handleClaim = (artist: any) => {
+    toast(`Link ${artist.name}?`, {
+        description: "This will connect your profile to this artist.",
+        action: {
+            label: "Confirm",
+            onClick: async () => {
+                const toastId = toast.loading("Linking profile...")
+                await claimArtist(artist.id, artist.image)
+                toast.dismiss(toastId)
+                toast.success("Profile Connected")
+                setResults([])
+            }
+        }
+    })
   }
 
   const handleSync = async () => {
     setSyncing(true);
+    const toastId = toast.loading("Syncing catalog from Spotify...");
+
     const result = await importSpotifyCatalog();
     setSyncing(false);
     
+    toast.dismiss(toastId);
+    
     if (result.success) {
-      alert(`Success! Imported ${result.count} tracks from Spotify.`);
+      toast.success("Sync Complete", {
+        description: `Imported ${result.count} tracks.`
+      })
     } else {
-      alert("Import failed. Please try again.");
+      toast.error("Import Failed", {
+        description: "Could not sync with Spotify."
+      })
     }
+  }
+
+  const handleReset = () => {
+    toast("Disconnect Spotify?", {
+        description: "This removes Spotify-imported songs from your view.",
+        action: {
+            label: "Disconnect",
+            onClick: async () => {
+                const toastId = toast.loading("Disconnecting...");
+                await resetSpotifyConnection();
+                toast.dismiss(toastId);
+                toast.success("Disconnected");
+            }
+        },
+        cancel: {
+            label: "Cancel",
+            onClick: () => {} // FIX: Added empty handler to satisfy TypeScript
+        }
+    })
   }
 
   if (currentArtistId) {
@@ -57,24 +91,37 @@ export function SpotifyConnect({ currentArtistId }: { currentArtistId?: string |
             </div>
           </div>
 
-          <Button 
-            onClick={handleSync} 
-            disabled={syncing} 
-            variant="outline" 
-            className="bg-white border-green-300 text-green-700 hover:bg-green-100"
-          >
-            {syncing ? (
-                <>
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> 
-                    Syncing...
-                </>
-            ) : (
-                <>
-                    <RefreshCw className="mr-2 h-4 w-4" /> 
-                    Sync Catalog
-                </>
-            )}
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+                onClick={handleSync} 
+                disabled={syncing} 
+                variant="outline" 
+                className="bg-white border-green-300 text-green-700 hover:bg-green-100"
+            >
+                {syncing ? (
+                    <>
+                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> 
+                        Syncing...
+                    </>
+                ) : (
+                    <>
+                        <RefreshCw className="mr-2 h-4 w-4" /> 
+                        Sync Catalog
+                    </>
+                )}
+            </Button>
+
+            <Button 
+                onClick={handleReset} 
+                variant="ghost" 
+                size="icon" 
+                title="Disconnect"
+                className="hover:bg-red-100 hover:text-red-600"
+            >
+                <XCircle className="h-5 w-5 text-red-500" />
+            </Button>
+          </div>
+          
         </CardContent>
       </Card>
     )
