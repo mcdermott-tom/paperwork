@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Search, CheckCircle, RefreshCw, XCircle } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from 'sonner' 
 
 // eslint-disable-next-line @next/next/no-img-element
 export function SpotifyConnect({ currentArtistId }: { currentArtistId?: string | null }) {
@@ -22,6 +22,7 @@ export function SpotifyConnect({ currentArtistId }: { currentArtistId?: string |
     setLoading(false)
   }
 
+  // FIX: Added closeButton to success toast
   const handleClaim = (artist: any) => {
     toast(`Link ${artist.name}?`, {
         description: "This will connect your profile to this artist.",
@@ -31,8 +32,10 @@ export function SpotifyConnect({ currentArtistId }: { currentArtistId?: string |
                 const toastId = toast.loading("Linking profile...")
                 await claimArtist(artist.id, artist.image)
                 toast.dismiss(toastId)
-                toast.success("Profile Connected")
-                setResults([])
+                toast.success("Profile Connected", {
+                    closeButton: true, // Show X on success
+                    description: `Successfully linked to ${artist.name}`
+                })
             }
         }
     })
@@ -49,15 +52,18 @@ export function SpotifyConnect({ currentArtistId }: { currentArtistId?: string |
     
     if (result.success) {
       toast.success("Sync Complete", {
-        description: `Imported ${result.count} tracks.`
+        description: `Imported ${result.count} tracks.`,
+        closeButton: true // Show X on final notification
       })
     } else {
       toast.error("Import Failed", {
-        description: "Could not sync with Spotify."
+        description: "Could not sync with Spotify.",
+        closeButton: true // Show X on error
       })
     }
   }
 
+  // NOTE: handleReset automatically hides the global close button because it uses the action/cancel buttons.
   const handleReset = () => {
     toast("Disconnect Spotify?", {
         description: "This removes Spotify-imported songs from your view.",
@@ -67,12 +73,12 @@ export function SpotifyConnect({ currentArtistId }: { currentArtistId?: string |
                 const toastId = toast.loading("Disconnecting...");
                 await resetSpotifyConnection();
                 toast.dismiss(toastId);
-                toast.success("Disconnected");
+                toast.success("Disconnected", { closeButton: true });
             }
         },
         cancel: {
             label: "Cancel",
-            onClick: () => {} // FIX: Added empty handler to satisfy TypeScript
+            onClick: () => {}
         }
     })
   }
