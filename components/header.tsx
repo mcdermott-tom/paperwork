@@ -104,10 +104,14 @@ export function Header() {
           </DropdownMenu>
 
           <DropdownMenu>
-            <DropdownMenuTrigger className="hover:text-gray-600 transition-colors">Splits ▾</DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem><Link href="/splits">Pending</Link></DropdownMenuItem>
-              <DropdownMenuItem><Link href="/splits/archive">Archive</Link></DropdownMenuItem>
+            <DropdownMenuTrigger className="hover:text-black transition-colors font-medium">Splits ▾</DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              {/* Link to the new page */}
+              <DropdownMenuItem asChild>
+                  <Link href="/dashboard/splits" className="cursor-pointer">My Splits</Link>
+              </DropdownMenuItem>
+              {/* You can add a filter later for "Pending" vs "Archive" */}
+              <DropdownMenuItem disabled className="text-muted-foreground">Archive (Coming Soon)</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </nav>

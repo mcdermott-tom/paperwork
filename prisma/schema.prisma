@@ -63,18 +63,17 @@ model Release {
 }
 
 model WriterSplit {
-  id         String  @id @default(uuid())
+  id         String   @id @default(uuid())
   songId     String
-  song       Song    @relation(fields: [songId], references: [id], onDelete: Cascade)
-  
-  // FIX: Make userId optional, add email for invites
+  song       Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
   userId     String?
-  user       User?   @relation(fields: [userId], references: [id])
-  
-  email      String? // Stores the email if they haven't signed up yet
-  
-  percentage Decimal @db.Decimal(5, 2)
+  user       User?    @relation(fields: [userId], references: [id])
+  email      String?
+  percentage Decimal  @db.Decimal(5, 2)
   role       String
+  
+  // ADD THIS LINE:
+  createdAt  DateTime @default(now()) 
 }
 
 model MasterSplit {
