@@ -50,7 +50,7 @@ export function Header() {
       <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b px-6 bg-background">
         <div className="flex items-center">
            {/* Placeholder for text logo */}
-           <div className="h-6 w-24 bg-muted/50 rounded animate-pulse" /> 
+           <div className="h-8 w-32 bg-muted/50 rounded animate-pulse" /> 
         </div>
       </header>
     )
@@ -59,9 +59,9 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b px-6 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 text-[#1f7a8c] dark:text-[#bfdbf7]">
       
-      {/* Left: Text Logo */}
+      {/* Left: Text Logo (Increased Font Size) */}
       <Link href="/dashboard" className="flex items-center gap-2 transition-opacity hover:opacity-80">
-        <span className="text-xl font-bold tracking-tight font-sans">
+        <span className="text-4xl font-bold tracking-tight font-sans">
           Paperwork
         </span>
       </Link>
@@ -69,6 +69,11 @@ export function Header() {
       {/* Right: Navigation & Profile */}
       <div className="flex items-center gap-6">
         <nav className="flex items-center gap-4 text-sm font-medium">
+          
+          {/* Direct Link for Placements (Moved to Left) */}
+          <Link href="/dashboard/placements" className="hover:text-primary transition-colors">
+            Placements
+          </Link>
           
           <DropdownMenu>
             <DropdownMenuTrigger className="hover:text-primary transition-colors">Releases ▾</DropdownMenuTrigger>
@@ -85,11 +90,6 @@ export function Header() {
               <DropdownMenuItem><Link href="/dashboard/songs/new">New Song</Link></DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {/* Direct Link for Placements */}
-          <Link href="/dashboard/placements" className="hover:text-primary transition-colors">
-            Placements
-          </Link>
 
           <DropdownMenu>
             <DropdownMenuTrigger className="hover:text-primary transition-colors">Splits ▾</DropdownMenuTrigger>
