@@ -55,13 +55,12 @@ function CompositionPieChart({ writers }: { writers: ClientWriter[] }) {
                     fill="#8884d8"
                     paddingAngle={2}
                     dataKey="value"
-                    nameKey="name" // Explicitly tell Recharts which key is the label
+                    nameKey="name"
                 >
                     {chartData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                 </Pie>
-                {/* FIX: Formatter now explicitly returns [Value, Name] to ensure the name appears */}
                 <Tooltip formatter={(value: any, name: any, props: any) => [`${value}%`, props.payload.name]} />
             </PieChart>
         </ResponsiveContainer>
@@ -151,7 +150,8 @@ export function WritersTable({ writers, songId }: { writers: ClientWriter[], son
   const [editingWriter, setEditingWriter] = useState<ClientWriter | null>(null);
 
   const totalPercentage = writers.reduce((sum, w) => sum + w.percentage, 0);
-  const isValidTotal = Math.abs(totalPercentage - 100) < 0.1;
+  // FIX: Stricter epsilon check (0.001) ensures 100.01 is marked invalid
+  const isValidTotal = Math.abs(totalPercentage - 100) < 0.001;
 
   const handleDelete = async (splitId: string) => {
     if (confirm("Remove this writer?")) await deleteSplit(splitId, songId);
@@ -191,7 +191,9 @@ export function WritersTable({ writers, songId }: { writers: ClientWriter[], son
                   )}
                 </TableCell>
                 <TableCell>{w.role}</TableCell>
-                <TableCell className="text-right font-mono font-bold">{w.percentage}%</TableCell>
+                <TableCell className="text-right font-mono font-bold">
+                    {Number(w.percentage).toFixed(2)}%
+                </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
                     <Button variant="ghost" size="icon" onClick={() => openEdit(w)}><Pencil className="h-3 w-3 text-gray-500"/></Button>
@@ -206,7 +208,7 @@ export function WritersTable({ writers, songId }: { writers: ClientWriter[], son
           <TableRow>
             <TableCell colSpan={2}>Total</TableCell>
             <TableCell className={`text-right font-bold ${isValidTotal ? 'text-green-600' : 'text-red-600'}`}>
-              {totalPercentage}%
+              {totalPercentage.toFixed(2)}%
             </TableCell>
             <TableCell />
           </TableRow>

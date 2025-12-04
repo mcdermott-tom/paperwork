@@ -8,7 +8,6 @@ import { renderToStream } from '@react-pdf/renderer'
 import { SplitSheetPDF } from '@/components/SplitSheetPDF' 
 import { createAuditLog } from '@/lib/logger'
 
-// Helper to get IP
 async function getIp() {
   const headersList = await headers()
   const forwardedFor = headersList.get('x-forwarded-for')
@@ -16,7 +15,6 @@ async function getIp() {
   return forwardedFor?.split(',')[0] ?? realIp ?? 'Unknown'
 }
 
-// Helper to get User Agent
 async function getUserAgent() {
   const headersList = await headers()
   return headersList.get('user-agent') ?? 'Unknown'
@@ -29,11 +27,11 @@ export async function signAndFinalizeSplitSheet(songId: string) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
   )
+
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
   try {
-    // 1. Fetch Data
     const song = await db.song.findUnique({
       where: { id: songId },
       include: { 
@@ -44,25 +42,19 @@ export async function signAndFinalizeSplitSheet(songId: string) {
 
     if (!song) return { error: 'Song not found' }
 
-    // 2. Generate PDF Stream
+    // Generate PDF
     const pdfStream = await renderToStream(
       <SplitSheetPDF song={song} writers={song.writers} />
     )
 
-    // 3. Convert Stream to Buffer (FIXED TYPING)
-    // We explicitly define this as a Buffer array to satisfy Buffer.concat
     const chunks: Buffer[] = []
-    
     for await (const chunk of pdfStream) {
-      // Force conversion to Buffer to handle string|Buffer chunks safely
       chunks.push(Buffer.from(chunk))
     }
-    
     const pdfBuffer = Buffer.concat(chunks)
 
-    // 4. Upload to Supabase Storage ('contracts' bucket)
+    // Upload
     const fileName = `${songId}_v${Date.now()}.pdf`
-    
     const { data: uploadData, error: uploadError } = await supabase
       .storage
       .from('contracts')
@@ -73,13 +65,13 @@ export async function signAndFinalizeSplitSheet(songId: string) {
 
     if (uploadError) throw new Error(`Upload Failed: ${uploadError.message}`)
 
-    // 5. Lock the Song
+    // Lock Song
     await db.song.update({
         where: { id: songId },
         data: { isLocked: true }
     });
 
-    // 6. Create the Immutable Record
+    // Create Record
     const splitSheet = await db.splitSheet.create({
       data: {
         songId: songId,
@@ -91,7 +83,7 @@ export async function signAndFinalizeSplitSheet(songId: string) {
       }
     })
 
-    // 7. Audit Log
+    // Audit Log
     await createAuditLog({
         userId: user.id,
         action: 'CONTRACT_SIGNED',
@@ -101,11 +93,13 @@ export async function signAndFinalizeSplitSheet(songId: string) {
         oldData: undefined,
     });
 
+    // Revalidate the page so the button disappears/changes state
     revalidatePath(`/dashboard/songs/${songId}`)
+    
     return { success: true }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("SIGNING ERROR:", error)
-    return { error: 'Failed to sign contract. Ensure "contracts" bucket exists in Supabase.' }
+    return { error: error.message || 'Failed to sign contract.' }
   }
 }

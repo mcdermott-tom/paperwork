@@ -1,24 +1,93 @@
-import { Page, Text, View, Document, StyleSheet, Font } from '@react-pdf/renderer';
+import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
 
 // Define styles for the PDF
 const styles = StyleSheet.create({
-  page: { flexDirection: 'column', backgroundColor: '#FFFFFF', padding: 40 },
-  header: { fontSize: 24, marginBottom: 20, textAlign: 'center', fontWeight: 'bold' },
-  section: { margin: 10, padding: 10 },
-  label: { fontSize: 10, color: '#666666', marginBottom: 2 },
-  value: { fontSize: 14, marginBottom: 10 },
-  table: { display: 'flex', width: 'auto', borderStyle: 'solid', borderWidth: 1, borderRightWidth: 0, borderBottomWidth: 0 },
-  tableRow: { margin: 'auto', flexDirection: 'row' },
-  tableCol: { width: '25%', borderStyle: 'solid', borderWidth: 1, borderLeftWidth: 0, borderTopWidth: 0 },
-  tableCell: { margin: 'auto', marginTop: 5, fontSize: 10, padding: 5 },
-  disclaimer: { fontSize: 8, color: '#888', marginTop: 30, fontStyle: 'italic', textAlign: 'center' },
-  signatureSection: { marginTop: 50, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  signatureBlock: { width: '45%', marginBottom: 40, borderTop: '1px solid #000', paddingTop: 5 },
-  signatureText: { fontSize: 10 }
+  page: { 
+    flexDirection: 'column', 
+    backgroundColor: '#FFFFFF', 
+    padding: 40 
+  },
+  header: { 
+    fontSize: 24, 
+    marginBottom: 20, 
+    textAlign: 'center', 
+    fontWeight: 'bold' 
+  },
+  section: { 
+    margin: 10, 
+    padding: 10 
+  },
+  label: { 
+    fontSize: 10, 
+    color: '#666666', 
+    marginBottom: 2 
+  },
+  value: { 
+    fontSize: 14, 
+    marginBottom: 10 
+  },
+  table: { 
+    display: 'flex', 
+    width: 'auto', 
+    borderStyle: 'solid', 
+    borderWidth: 1, 
+    borderRightWidth: 0, 
+    borderBottomWidth: 0 
+  },
+  tableRow: { 
+    margin: 'auto', 
+    flexDirection: 'row' 
+  },
+  tableCol: { 
+    width: '25%', 
+    borderStyle: 'solid', 
+    borderWidth: 1, 
+    borderLeftWidth: 0, 
+    borderTopWidth: 0 
+  },
+  tableCell: { 
+    margin: 'auto', 
+    marginTop: 5, 
+    fontSize: 10, 
+    padding: 5 
+  },
+  disclaimer: { 
+    fontSize: 8, 
+    color: '#888', 
+    marginTop: 30, 
+    fontStyle: 'italic', 
+    textAlign: 'center' 
+  },
+  signatureSection: { 
+    marginTop: 50, 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    justifyContent: 'space-between' 
+  },
+  signatureBlock: { 
+    width: '45%', 
+    marginBottom: 40, 
+    // FIXED: CSS Shorthand (e.g. '1px solid #000') crashes React-PDF. Use explicit props:
+    borderTopWidth: 1,
+    borderTopColor: '#000',
+    borderTopStyle: 'solid',
+    paddingTop: 5 
+  },
+  signatureText: { 
+    fontSize: 10 
+  }
 });
 
+// Helper to safely format percentages from Prisma Decimals or Numbers
+const formatPercent = (val: any) => {
+  if (val === null || val === undefined) return '0.00';
+  // Convert to string first to handle Decimal objects, then parse to float
+  const num = parseFloat(`${val}`);
+  return isNaN(num) ? '0.00' : num.toFixed(2);
+};
+
 // The Component
-export const SplitSheetPDF = ({ song, writers }: { song: any, writers: any[] }) => (
+export const SplitSheetPDF = ({ song, writers = [] }: { song: any, writers: any[] }) => (
   <Document>
     <Page size="A4" style={styles.page}>
       
@@ -31,10 +100,10 @@ export const SplitSheetPDF = ({ song, writers }: { song: any, writers: any[] }) 
       {/* SONG INFO */}
       <View style={styles.section}>
         <Text style={styles.label}>Composition Title</Text>
-        <Text style={styles.value}>{song.title}</Text>
+        <Text style={styles.value}>{song?.title || 'Untitled'}</Text>
         
         <Text style={styles.label}>ISWC</Text>
-        <Text style={styles.value}>{song.iswc || 'N/A'}</Text>
+        <Text style={styles.value}>{song?.iswc || 'N/A'}</Text>
         
         <Text style={styles.label}>Date Created</Text>
         <Text style={styles.value}>{new Date().toLocaleDateString()}</Text>
@@ -58,13 +127,13 @@ export const SplitSheetPDF = ({ song, writers }: { song: any, writers: any[] }) 
                 <Text style={styles.tableCell}>{w.user?.name || 'Pending User'}</Text>
               </View>
               <View style={styles.tableCol}>
-                <Text style={styles.tableCell}>{w.user?.email || w.email}</Text>
+                <Text style={styles.tableCell}>{w.user?.email || w.email || ''}</Text>
               </View>
               <View style={styles.tableCol}>
-                <Text style={styles.tableCell}>{w.role}</Text>
+                <Text style={styles.tableCell}>{w.role || 'Writer'}</Text>
               </View>
               <View style={styles.tableCol}>
-                <Text style={styles.tableCell}>{w.percentage}%</Text>
+                <Text style={styles.tableCell}>{formatPercent(w.percentage)}%</Text>
               </View>
             </View>
           ))}
@@ -77,7 +146,7 @@ export const SplitSheetPDF = ({ song, writers }: { song: any, writers: any[] }) 
           <View style={styles.signatureBlock} key={i}>
             <Text style={styles.signatureText}>Signed: ____________________</Text>
             <Text style={{ ...styles.signatureText, fontWeight: 'bold', marginTop: 5 }}>
-              {w.user?.name || w.email} ({w.percentage}%)
+              {w.user?.name || w.email || 'Writer'} ({formatPercent(w.percentage)}%)
             </Text>
             <Text style={styles.signatureText}>Date: ____________________</Text>
           </View>

@@ -77,7 +77,11 @@ model WriterSplit {
   percentage Decimal  @db.Decimal(5, 2)
   role       String
   
-  // ADD THIS LINE:
+  // --- NEW TRACKING FIELDS ---
+  advance    Decimal  @default(0) @db.Decimal(10, 2) // Upfront money (e.g. Pub Advance)
+  collected  Decimal  @default(0) @db.Decimal(10, 2) // Royalties collected
+  status     String   @default("Active") // "Active", "Recouping", "Fully Paid"
+
   createdAt  DateTime @default(now()) 
 }
 
