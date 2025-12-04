@@ -9,12 +9,12 @@ import { revalidatePath } from 'next/cache'
 export type IncomeItem = {
   id: string
   type: 'PLACEMENT' | 'SPLIT'
-  title: string     // Song Title (Split) or Track Title (Placement)
-  subtitle: string  // Client (Placement) or "Writer Share" (Split)
-  amount: number    // Fee (Placement) or Advance (Split)
+  title: string
+  subtitle: string
+  amount: number
   status: string
   date: Date
-  songId?: string   // Useful for linking back to the song
+  songId?: string
 }
 
 // --- 2. AUTH HELPER ---
@@ -29,23 +29,30 @@ async function getUserId() {
   return user?.id
 }
 
-// --- 3. THE UNIFIER FUNCTION (New) ---
+// --- 3. THE UNIFIER FUNCTION (Fixed) ---
 export async function getUnifiedIncome(): Promise<IncomeItem[]> {
   const userId = await getUserId()
   if (!userId) return []
 
-  // A. Fetch Placements (Linked to songs where user is a writer)
+  // A. Fetch Placements
   const placements = await db.placement.findMany({
     where: { song: { writers: { some: { userId } } } },
     include: { song: { select: { title: true } } },
     orderBy: { createdAt: 'desc' }
   })
 
-  // B. Fetch Splits (Directly owned by the user)
-  // Note: Using 'writerSplit' based on your schema
+  // B. Fetch Splits
+  // FIXED: Changed 'isFinalized' (which doesn't exist) to 'isLocked'
   const splits = await db.writerSplit.findMany({
     where: { userId },
-    include: { song: { select: { title: true } } },
+    include: { 
+      song: { 
+        select: { 
+          title: true,
+          isLocked: true // <--- USING THIS AVAILABLE FIELD INSTEAD
+        } 
+      } 
+    },
     orderBy: { createdAt: 'desc' }
   })
 
@@ -56,22 +63,27 @@ export async function getUnifiedIncome(): Promise<IncomeItem[]> {
     title: p.song.title, 
     subtitle: `${p.client} (${p.licenseType})`, 
     amount: p.fee.toNumber(),
-    status: p.feeStatus, // pending, invoiced, paid
+    status: p.feeStatus, 
     date: p.createdAt,
     songId: p.songId
   }))
 
   // D. Normalize Splits
-  const normalizedSplits: IncomeItem[] = splits.map(s => ({
-    id: s.id,
-    type: 'SPLIT',
-    title: s.song.title,
-    subtitle: `${s.percentage.toNumber()}% ${s.role} Share`,
-    amount: s.advance.toNumber(), // Showing the "Upfront" value here
-    status: s.status, // Active, Recouping
-    date: s.createdAt,
-    songId: s.songId
-  }))
+  const normalizedSplits: IncomeItem[] = splits.map(s => {
+    // LOGIC: If song is Locked, we consider it Active. If not, it's Pending.
+    const displayStatus = s.song.isLocked ? 'Active' : 'Pending'
+
+    return {
+      id: s.id,
+      type: 'SPLIT',
+      title: s.song.title,
+      subtitle: `${s.percentage.toNumber()}% ${s.role} Share`,
+      amount: s.advance.toNumber(), 
+      status: displayStatus, 
+      date: s.createdAt,
+      songId: s.songId
+    }
+  })
 
   // E. Merge and Sort
   return [...normalizedPlacements, ...normalizedSplits].sort(
@@ -79,13 +91,12 @@ export async function getUnifiedIncome(): Promise<IncomeItem[]> {
   )
 }
 
-// --- 4. CRUD ACTIONS (Restored) ---
+// --- 4. CRUD ACTIONS ---
 
 export async function createPlacement(formData: FormData) {
   const userId = await getUserId()
   if (!userId) return { error: 'Unauthorized' }
 
-  // Extract and Validate
   const songId = formData.get('songId') as string
   const client = formData.get('client') as string
   const project = formData.get('project') as string
@@ -96,31 +107,20 @@ export async function createPlacement(formData: FormData) {
   const notes = formData.get('notes') as string
 
   if (!songId || !client) {
-      return { error: "Missing required fields (Song or Client)" }
+      return { error: "Missing required fields" }
   }
 
   try {
     await db.placement.create({
-      data: { 
-          songId, 
-          client, 
-          project, 
-          licenseType, 
-          fee, 
-          feeStatus, 
-          proStatus, 
-          notes 
-      }
+      data: { songId, client, project, licenseType, fee, feeStatus, proStatus, notes }
     })
     revalidatePath('/dashboard/placements')
     return { success: true }
   } catch (error) {
-    console.error("CREATE PLACEMENT DB ERROR:", error)
     return { error: 'Database failed to save placement.' }
   }
 }
 
-// RESTORED: This is the function that was missing
 export async function updatePlacementField(id: string, field: 'feeStatus' | 'proStatus', value: string) {
   const userId = await getUserId()
   if (!userId) return { error: 'Unauthorized' }
