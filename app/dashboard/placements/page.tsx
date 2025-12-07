@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { Wallet, Clapperboard, Music2, ArrowUpRight } from 'lucide-react'
+import { Wallet, Clapperboard, Music2, ArrowUpRight, CircleDashed } from 'lucide-react'
 import Link from 'next/link'
+import { InteractiveStatusBadge } from './status-badge'
 
 // Helper for currency
 const formatMoney = (amount: number) => {
@@ -16,12 +17,25 @@ const formatMoney = (amount: number) => {
   }).format(amount)
 }
 
+// Utility for Conditional Classes
+function cn(...classes: (string | undefined | null | false)[]) {
+  return classes.filter(Boolean).join(' ')
+}
+
 export default async function UnifiedTrackerPage() {
   // Fetch the merged data
   const items = await getUnifiedIncome()
 
-  // Calculate Total Value (Advances + Fees)
+  // Calculate Totals
   const totalValue = items.reduce((sum, item) => sum + item.amount, 0)
+  
+  // Calculate "Paid" vs "Pending"
+  const totalCollected = items
+    .filter(i => i.status.toLowerCase() === 'paid' || i.status.toLowerCase() === 'active')
+    .reduce((sum, item) => sum + item.amount, 0)
+
+  const pendingAmount = totalValue - totalCollected
+  const isFullyCollected = totalCollected === totalValue && totalValue > 0
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -33,11 +47,9 @@ export default async function UnifiedTrackerPage() {
           <p className="text-gray-500">Unified view of placements and split advances.</p>
         </div>
         <div className="flex gap-2">
-           {/* Link back to songs to manage splits */}
            <Link href="/dashboard/songs">
              <Button variant="outline">Manage Splits</Button>
            </Link>
-           {/* Link to create a new placement */}
            <Link href="/dashboard/placements/new">
              <Button>+ Log Placement</Button>
            </Link>
@@ -46,16 +58,42 @@ export default async function UnifiedTrackerPage() {
 
       {/* SUMMARY STATS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        
+        {/* CARD 1: PENDING / OUTSTANDING (Leftmost) */}
+        <Card className="bg-amber-50 border-amber-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-amber-900">Outstanding (Pending)</CardTitle>
+                <CircleDashed className="h-4 w-4 text-amber-600" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold text-amber-700">
+                    {formatMoney(pendingAmount)}
+                </div>
+                <div className="text-xs text-amber-600/80 mt-1">
+                    Waiting for collection
+                </div>
+            </CardContent>
+        </Card>
+
+        {/* CARD 2: TOTAL TRACKED VALUE */}
         <Card className="bg-slate-50 border-slate-200">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-slate-700">Total Tracked Value</CardTitle>
-                <Wallet className="h-4 w-4 text-green-600" />
+                <Wallet className={`h-4 w-4 ${isFullyCollected ? 'text-green-600' : 'text-blue-600'}`} />
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold text-slate-900">{formatMoney(totalValue)}</div>
-                <p className="text-xs text-slate-500">Combined Fees & Advances</p>
+                <div className={cn(
+                    "text-2xl font-bold",
+                    isFullyCollected ? "text-green-700" : "text-slate-900"
+                )}>
+                    {formatMoney(totalValue)}
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                    Combined Fees & Advances
+                </div>
             </CardContent>
         </Card>
+
       </div>
 
       {/* UNIFIED TABLE */}
@@ -87,11 +125,11 @@ export default async function UnifiedTrackerPage() {
                             <TableRow key={`${item.type}-${item.id}`}>
                                 <TableCell>
                                     {item.type === 'PLACEMENT' ? (
-                                        <Badge className="bg-blue-600 hover:bg-blue-700">
+                                        <Badge className="bg-blue-600 hover:bg-blue-700 w-fit">
                                             <Clapperboard className="w-3 h-3 mr-1" /> Placement
                                         </Badge>
                                     ) : (
-                                        <Badge variant="secondary" className="bg-purple-100 text-purple-700 hover:bg-purple-200">
+                                        <Badge variant="secondary" className="bg-purple-100 text-purple-700 hover:bg-purple-200 w-fit">
                                             <Music2 className="w-3 h-3 mr-1" /> Split
                                         </Badge>
                                     )}
@@ -103,13 +141,21 @@ export default async function UnifiedTrackerPage() {
                                     {item.subtitle}
                                 </TableCell>
                                 <TableCell>
-                                    <StatusBadge status={item.status} />
+                                    <InteractiveStatusBadge 
+                                        id={item.id} 
+                                        type={item.type} 
+                                        initialStatus={item.status} 
+                                    />
                                 </TableCell>
                                 <TableCell className="text-right font-mono font-medium">
                                     {item.amount > 0 ? formatMoney(item.amount) : '-'}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    <Link href={`/dashboard/songs/${item.songId}`}>
+                                    <Link href={
+                                        item.type === 'PLACEMENT' 
+                                        ? `/dashboard/placements/${item.id}` 
+                                        : `/dashboard/songs/${item.songId}`
+                                    }>
                                         <Button variant="ghost" size="icon">
                                             <ArrowUpRight className="h-4 w-4 text-gray-400" />
                                         </Button>
@@ -124,20 +170,4 @@ export default async function UnifiedTrackerPage() {
       </Card>
     </div>
   )
-}
-
-// Small helper component for the Status Badge color logic
-function StatusBadge({ status }: { status: string }) {
-    const s = status.toLowerCase()
-    let styles = "bg-gray-100 text-gray-700"
-
-    if (s === 'paid' || s === 'active') styles = "bg-green-100 text-green-700"
-    if (s === 'invoiced' || s === 'recouping') styles = "bg-yellow-100 text-yellow-800 border-yellow-200"
-    if (s === 'pending') styles = "bg-blue-50 text-blue-700"
-
-    return (
-        <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${styles}`}>
-            {status}
-        </span>
-    )
 }

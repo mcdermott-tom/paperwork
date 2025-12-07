@@ -149,3 +149,50 @@ export async function deletePlacement(id: string) {
     return { error: 'Failed to delete placement.' }
   }
 }
+
+
+// --- 5. SINGLE PLACEMENT ACTIONS ---
+
+export async function getPlacement(id: string) {
+  const userId = await getUserId()
+  if (!userId) return null
+
+  const placement = await db.placement.findUnique({
+    where: { id },
+    include: { 
+      song: { select: { title: true } } 
+    }
+  })
+
+  if (!placement) return null
+
+  // FIXED: Convert Prisma Decimal to a standard JavaScript Number
+  return {
+    ...placement,
+    fee: placement.fee.toNumber() 
+  }
+}
+
+export async function updatePlacement(id: string, formData: FormData) {
+  const userId = await getUserId()
+  if (!userId) return { error: 'Unauthorized' }
+
+  const client = formData.get('client') as string
+  const project = formData.get('project') as string
+  const licenseType = formData.get('licenseType') as string
+  const fee = parseFloat(formData.get('fee') as string) || 0
+  const feeStatus = formData.get('feeStatus') as string
+  const notes = formData.get('notes') as string
+
+  try {
+    await db.placement.update({
+      where: { id },
+      data: { client, project, licenseType, fee, feeStatus, notes }
+    })
+    revalidatePath(`/dashboard/placements/${id}`)
+    revalidatePath('/dashboard/placements')
+    return { success: true }
+  } catch (error) {
+    return { error: 'Failed to update placement.' }
+  }
+}
