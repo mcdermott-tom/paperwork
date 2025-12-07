@@ -57,7 +57,7 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b px-6 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 text-[#1f7a8c] dark:text-[#bfdbf7]">
+    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b px-6 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 text-[#1f7a8c] dark:text-[#bfdbf7]">
       
       {/* Left: Text Logo (Increased Font Size) */}
       <Link href="/dashboard" className="flex items-center gap-2 transition-opacity hover:opacity-80">

@@ -69,7 +69,7 @@ export function EditPlacementForm({ placement }: { placement: any }) {
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Notes</label>
-            <textarea name="notes" defaultValue={placement.notes || ''} className="flex min-h-[80px] w-full rounded-md border border-input px-3 py-2 text-sm bg-background" />
+            <textarea name="notes" defaultValue={placement.notes || ''} className="flex min-h-20 w-full rounded-md border border-input px-3 py-2 text-sm bg-background" />
           </div>
 
           <div className="flex justify-between items-center pt-4">
