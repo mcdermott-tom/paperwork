@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button'
 import { Disc, Music2, Plus, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { notFound } from 'next/navigation'
 
 // Action Buttons
 import { DownloadSplitSheetButton } from './pdf-button'
 import { ExportCWRButton } from './export-button'
-import SignContractButton from './sign-contract-button' 
+import { SignContractButton } from './sign-contract-button' // <--- FIX 1: Named Import
 
 // Client Components
 import { 
@@ -33,23 +34,12 @@ const formatISWC = (iswc: string | null | undefined) => {
 async function getSongData(songId: string) {
   if (!songId) return null;
 
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
-  )
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) return null
-
-  // Fetch Data
   const song = await db.song.findUnique({
     where: { id: songId },
     include: {
       writers: { 
         where: { songId: songId },
-        include: { user: { select: { name: true, email: true } } } 
+        include: { user: { select: { id: true, name: true, email: true } } } // Include ID for matching
       },
       releases: {
         select: { id: true, title: true, isrc: true, coverArtUrl: true } 
@@ -61,13 +51,27 @@ async function getSongData(songId: string) {
     }
   })
 
-  if (!song) return null
   return song
 }
 
 // --- MAIN PAGE COMPONENT ---
 export default async function SongDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  
+  // 1. Auth Check (Needed to identify which writer is viewing the page)
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return (
+    <div className="p-6">Unauthorized</div>
+  )
+
+  // 2. Fetch Song Data
   const song = await getSongData(id)
 
   if (!song) return (
@@ -79,13 +83,19 @@ export default async function SongDetailPage({ params }: { params: Promise<{ id:
     </div>
   );
 
-  // FIX: Convert ALL Decimal fields to numbers to satisfy Next.js
+  // 3. Process Writers Data & Identify Current User
   const writersForClient = song.writers.map(writer => ({
     ...writer,
     percentage: writer.percentage.toNumber(),
-    advance: writer.advance ? writer.advance.toNumber() : 0,     // <--- Added conversion
-    collected: writer.collected ? writer.collected.toNumber() : 0, // <--- Added conversion
+    advance: writer.advance ? writer.advance.toNumber() : 0,    
+    collected: writer.collected ? writer.collected.toNumber() : 0, 
   }));
+
+  // Identify the specific writer entry for the logged-in user
+  const currentWriter = writersForClient.find(w => w.userId === user.id);
+  
+  // Check if they have signed the Admin LOD (using the new field)
+  const hasSignedLOD = currentWriter?.adminStatus === 'SIGNED_LOD';
 
   const songMetadata = {
     id: song.id,
@@ -96,10 +106,7 @@ export default async function SongDetailPage({ params }: { params: Promise<{ id:
   const featuredCoverArtUrl = song.releases.find(r => r.coverArtUrl)?.coverArtUrl || null;
   const displayISWC = formatISWC(song.iswc);
   
-  // Check if signed
-  const hasSigned = song.splitSheets.length > 0;
-
-  // Calculate total validity on server to disable actions
+  // Validation for Export
   const totalPercentage = writersForClient.reduce((sum, w) => sum + w.percentage, 0);
   const isTotalValid = Math.abs(totalPercentage - 100) < 0.001;
 
@@ -115,7 +122,7 @@ export default async function SongDetailPage({ params }: { params: Promise<{ id:
             ISWC: {displayISWC || 'Not Registered'}
           </p>
         </div>
-        {!hasSigned && <DeleteSongButton songId={song.id} songTitle={song.title} />}
+        <DeleteSongButton songId={song.id} songTitle={song.title} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -170,12 +177,18 @@ export default async function SongDetailPage({ params }: { params: Promise<{ id:
                   <DownloadSplitSheetButton song={songMetadata} writers={writersForClient} />
                   <ExportCWRButton songId={song.id} />
                   
-                  {hasSigned ? (
+                  {/* FIX 2: Check Admin Status for Green Button */}
+                  {hasSignedLOD ? (
                     <Button disabled variant="secondary" className="gap-2 bg-green-100 text-green-800 border border-green-200 opacity-100">
                         <CheckCircle2 className="h-4 w-4" /> Signed
                     </Button>
                   ) : (
-                    <SignContractButton songId={song.id} />
+                    // FIX 3: Pass Required Props (songTitle, userLegalName)
+                    <SignContractButton 
+                      songId={song.id} 
+                      songTitle={song.title}
+                      userLegalName={currentWriter?.user?.name || ''}
+                    />
                   )}
                </div>
              </div>

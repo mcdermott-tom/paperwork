@@ -1,71 +1,73 @@
 'use client'
 
 import { useState } from 'react'
-import { signAndFinalizeSplitSheet } from './signing-action' 
-import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { FileSignature, Loader2, CheckCircle } from 'lucide-react'
+import { generateLOD } from './actions' // Server action we'll define below
+import { toast } from 'sonner' // Assuming you use sonner/hot-toast
 
-export default function SignContractButton({ songId }: { songId: string }) {
-  const [isLoading, setIsLoading] = useState(false)
+interface SignContractButtonProps {
+  songId: string
+  songTitle: string
+  userLegalName: string
+}
 
-  const handleSignClick = () => {
-    // 1. CLEANUP: Dismiss all existing toasts so they don't stack up
-    toast.dismiss()
+export const SignContractButton = ({ songId, songTitle, userLegalName }: SignContractButtonProps) => {
+  const [status, setStatus] = useState<'idle' | 'signing' | 'signed'>('idle')
 
-    // 2. Show the new confirmation
-    toast("Confirm Signature", {
-      description: "By clicking Confirm, you are digitally signing this split sheet. This will LOCK the song details and record your IP address.",
-      duration: 8000,
-      action: {
-        label: "Confirm",
-        onClick: async () => {
-          setIsLoading(true)
-          
-          // Dismiss the "Confirm" toast immediately so the "Loading" toast takes its place
-          toast.dismiss() 
-          const toastId = toast.loading("Signing contract...")
+  const handleSign = async () => {
+    if (!userLegalName) {
+      toast.error("Please update your profile with your Legal Name first.")
+      return
+    }
 
-          try {
-            const result = await signAndFinalizeSplitSheet(songId)
-            toast.dismiss(toastId)
+    setStatus('signing')
 
-            if (result.error) {
-              toast.error("Signing Failed", {
-                description: result.error,
-                closeButton: true
-              })
-            } else {
-              toast.success("Contract Signed and Archived!", {
-                description: "The split sheet is now locked.",
-                closeButton: true 
-              })
-            }
-          } catch (err) {
-            toast.dismiss(toastId)
-            toast.error("System Error", {
-              description: "Something went wrong. Please try again.",
-              closeButton: true
-            })
-          } finally {
-            setIsLoading(false)
-          }
-        },
-      },
-      cancel: {
-        label: "Cancel",
-        onClick: () => toast.dismiss(), // Dismiss if they cancel too
-      },
-    })
+    try {
+      // 1. Trigger Server Action to generate PDF and log the timestamp
+      const result = await generateLOD(songId)
+      
+      if (result.error) throw new Error(result.error)
+
+      // 2. Success State
+      setStatus('signed')
+      toast.success(`Contract Signed for "${songTitle}"`)
+      
+      // Optional: Auto-download the PDF for their records
+      // window.open(result.pdfUrl, '_blank')
+
+    } catch (err) {
+      console.error(err)
+      toast.error("Failed to sign contract. Please try again.")
+      setStatus('idle')
+    }
+  }
+
+  if (status === 'signed') {
+    return (
+      <button disabled className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-md border border-green-200 cursor-default">
+        <CheckCircle className="w-4 h-4" />
+        <span>Signed & Processing</span>
+      </button>
+    )
   }
 
   return (
-    <Button 
-      variant="default" 
-      disabled={isLoading} 
-      onClick={handleSignClick}
-    >
-      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign Contract"}
-    </Button>
+    <div className="flex flex-col gap-2">
+      <button
+        onClick={handleSign}
+        disabled={status === 'signing'}
+        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors shadow-sm disabled:opacity-50"
+      >
+        {status === 'signing' ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <FileSignature className="w-4 h-4" />
+        )}
+        <span>Sign Admin Agreement (20%)</span>
+      </button>
+      <p className="text-[10px] text-gray-500 max-w-[200px] leading-tight">
+        By clicking, you authorize Paperwork to collect unclaimed royalties for this work. You retain 100% copyright ownership.
+      </p>
+    </div>
   )
 }
