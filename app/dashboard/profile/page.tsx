@@ -4,7 +4,6 @@ import { db } from '@/lib/db'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import ProfileForm from './profile-form' 
-import { SpotifyConnect } from './spotify-search' // NEW IMPORT
 
 // 1. Server-side data fetch function
 async function getUserProfileData() {
@@ -19,14 +18,13 @@ async function getUserProfileData() {
   if (!user) return null
 
   // Fetch the profile data
+  // FIXED: Removed 'spotifyArtistId' from selection as it was deleted from schema
   const profile = await db.user.findUnique({ 
     where: { id: user.id },
-    // UPDATE: Select the new Spotify fields
     select: { 
       name: true, 
       pro: true, 
       ipiNumber: true,
-      spotifyArtistId: true 
     } 
   })
 
@@ -43,8 +41,10 @@ export default async function ProfilePage() {
     <div className="container mx-auto p-6 max-w-2xl space-y-6">
       <h1 className="text-3xl font-bold">Artist Settings</h1>
       
-      {/* 1. SPOTIFY CONNECTION CARD */}
-      <SpotifyConnect currentArtistId={userData?.spotifyArtistId} />
+      {/* FIXED: Removed <SpotifyConnect> 
+         We are no longer syncing entire artist profiles. 
+         Song data is now added via the Search Dashboard.
+      */}
 
       {/* 2. EXISTING PROFILE FORM */}
       <ProfileForm initialData={userData} />

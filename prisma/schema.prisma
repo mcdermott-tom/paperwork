@@ -12,56 +12,66 @@ model User {
   id              String    @id @default(uuid())
   email           String    @unique
   name            String?
+  
+  // PRO / Legal Info
   pro             String?        
   ipiNumber       String?        
   
-  // Spotify Metadata
-  spotifyArtistId String?   @unique 
-  avatarUrl       String?        
-  
+  // External Integrations
   clerkId         String?        
   stripeConnectId String?        
+  
+  // Relationships
   accounts        Account[]      
   writerSplits    WriterSplit[] 
   masterSplits    MasterSplit[] 
+  sentInvites     Invite[]  @relation("Sender")
+
   createdAt       DateTime  @default(now())
 }
 
 model Account {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  type      String   // "personal", "manager", "label"
-  createdAt DateTime @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+  type      String    // "personal", "manager", "label"
+  createdAt DateTime  @default(now())
 }
 
 model Song {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   title     String
-  iswc      String?  @unique
-  isLocked  Boolean  @default(false)
   
-  // Track where this data came from
-  importSource  String?        // e.g. "spotify", "csv", "manual"
+  // Persistent External IDs (The "Discography" Fix)
+  spotifyTrackId String?   @unique 
+  iswc           String?   @unique
   
-  writers       WriterSplit[]
-  releases      Release[]
-  splitSheets   SplitSheet[]
-  placements    Placement[]    
+  isLocked       Boolean   @default(false)
+  importSource   String?   // "spotify_search", "manual", "csv"
+  
+  // Relationships
+  writers        WriterSplit[]
+  releases       Release[]
+  splitSheets    SplitSheet[]
+  placements     Placement[]     
+  invites        Invite[]
   
   createdAt           DateTime  @default(now())
   cwrFileGeneratedAt  DateTime?
 }
 
 model Release {
-  id           String   @id @default(uuid())
-  songId       String
-  song         Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
-  upc          String?  @unique
-  isrc         String?  @unique
-  title        String
+  id          String   @id @default(uuid())
+  songId      String
+  song        Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
   
-  coverArtUrl  String?        
+  title       String
+  upc         String?  @unique
+  
+  // REMOVED @unique below to prevent Spotify duplicates from crashing the app
+  isrc        String?  
+  
+  coverArtUrl String?  
   
   masterOwners MasterSplit[]
   createdAt    DateTime @default(now())
@@ -71,45 +81,73 @@ model WriterSplit {
   id          String   @id @default(uuid())
   songId      String
   song        Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  
+  // The User might not exist yet (if invited via email), so User is optional
   userId      String?
   user        User?    @relation(fields: [userId], references: [id])
-  email       String?
+  
+  // Snapshot of the writer's details for this specific song
+  email       String?  // Crucial for the "Invite Flow" before they sign up
+  name        String?  // "Taylor Swift" (if manually added)
   percentage  Decimal  @db.Decimal(5, 2)
-  role        String
+  role        String   // "Lyricist", "Composer", "Producer"
   
   // --- TRACKING FIELDS ---
   advance     Decimal  @default(0) @db.Decimal(10, 2) 
   collected   Decimal  @default(0) @db.Decimal(10, 2) 
   status      String   @default("Active") 
 
-  // NEW: Admin Contract Status (For the LOD)
-  // I added this field here instead of creating a new table
-  adminStatus String   @default("UNCLAIMED") // "UNCLAIMED", "SIGNED_LOD"
+  // LEGAL STATUS
+  // "UNCLAIMED" = Created by you, but they haven't seen it
+  // "PENDING_SIGNATURE" = Invite sent
+  // "SIGNED_LOD" = They clicked the magic link and agreed
+  adminStatus String   @default("UNCLAIMED") 
 
   createdAt   DateTime @default(now()) 
   
-  @@unique([userId, songId]) // Ensures one writer entry per song
+  @@unique([userId, songId]) 
 }
 
 model MasterSplit {
   id          String  @id @default(uuid())
   releaseId   String
   release     Release @relation(fields: [releaseId], references: [id])
+  
   userId      String?
   user        User?   @relation(fields: [userId], references: [id])
+  
   percentage  Decimal @db.Decimal(5, 2)
   role        String  // "Producer", "Label"
 }
 
+// NEW: The Magic Link System
+model Invite {
+  id          String   @id @default(uuid())
+  token       String   @unique // The secure string in the email link
+  
+  songId      String
+  song        Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  
+  senderId    String
+  sender      User     @relation("Sender", fields: [senderId], references: [id])
+  
+  recipientEmail String
+  status         String   @default("PENDING") // "PENDING", "ACCEPTED", "EXPIRED"
+  expiresAt      DateTime
+  
+  createdAt   DateTime @default(now())
+}
+
 model SplitSheet {
   id             String   @id @default(uuid())
-  
   songId         String
   song           Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
   
   pdfUrl         String
   signedByUserId String
   signedAt       DateTime @default(now())
+  
+  // Legal Audit Trail
   signedIp       String?
   userAgent      String?
   version        Int      @default(1)

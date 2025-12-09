@@ -5,8 +5,9 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { Music, Disc, ArrowRight } from 'lucide-react'
-import { ReleaseArtwork } from '@/components/artwork' // Ensure this component exists
+import { ReleaseArtwork } from '@/components/artwork' 
+import { SearchSong } from './songs/new/search-song' 
+import { UnregisteredSongsWidget } from './unregistered-songs-widget' // Import new widget
 
 // --- SERVER DATA FETCHING ---
 async function getDashboardData() {
@@ -25,7 +26,6 @@ async function getDashboardData() {
     where: { writers: { some: { userId: user.id } } },
     orderBy: { createdAt: 'desc' },
     take: 5,
-    include: { _count: { select: { releases: true } } }
   })
 
   // 2. Fetch Recent Releases (Masters)
@@ -33,25 +33,39 @@ async function getDashboardData() {
     where: { song: { writers: { some: { userId: user.id } } } },
     orderBy: { createdAt: 'desc' },
     take: 5,
-    // FIX: Include coverArtUrl
     include: { song: { select: { title: true } } }
   })
 
-  // 3. Calculate Catalog Health (Songs with ISWC vs Total)
-  const totalSongs = await db.song.count({
-    where: { writers: { some: { userId: user.id } } }
-  })
-  
-  const songsWithIswc = await db.song.count({
+  // 3. NEW: Fetch "Action Items" (Songs missing ISWC or Signed Split)
+  // We fetch songs connected to the user where critical fields are null
+  const incompleteSongsRaw = await db.song.findMany({
     where: { 
-      writers: { some: { userId: user.id } },
-      iswc: { not: null } 
-    }
+        writers: { some: { userId: user.id } },
+        OR: [
+            { iswc: null },
+            // You can add logic here for missing split sheets if you track that on the Song level
+            // e.g. splitSheets: { none: {} } 
+        ]
+    },
+    take: 10,
+    select: { id: true, title: true, iswc: true }
   })
 
-  const healthScore = totalSongs > 0 ? Math.round((songsWithIswc / totalSongs) * 100) : 0
+  // Transform for the widget
+  const actionItems = incompleteSongsRaw.map(song => {
+      const missing = [];
+      if (!song.iswc) missing.push("Missing ISWC");
+      // if (!song.hasSplitSheet) missing.push("Sign Split Sheet");
+      
+      return {
+          id: song.id,
+          title: song.title,
+          artist: "Unknown", // You could fetch this from the first release if needed
+          missingItems: missing
+      }
+  })
 
-  return { recentSongs, recentReleases, healthScore, totalSongs, songsWithIswc }
+  return { recentSongs, recentReleases, actionItems }
 }
 
 // HELPER: Simple format for display
@@ -68,7 +82,18 @@ export default async function DashboardPage() {
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* QUADRANT 1: RECENT COMPOSITIONS (Real Data) */}
+        {/* QUADRANT 1 (TL): SPOTIFY SEARCH */}
+        <Card className="col-span-1 min-h-[350px] border-blue-100 shadow-sm">
+          <CardHeader>
+            <CardTitle>Add to Discography</CardTitle>
+            <CardDescription>Search Spotify to instantly claim your songs.</CardDescription>
+          </CardHeader>
+          <CardContent>
+             <SearchSong />
+          </CardContent>
+        </Card>
+
+        {/* QUADRANT 2 (TR): RECENT SONGS */}
         <Card className="col-span-1 min-h-[350px]">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Recent Songs</CardTitle>
@@ -95,35 +120,7 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* QUADRANT 2: CATALOG HEALTH (The "Gamification") */}
-        <Card className="col-span-1 min-h-[350px]">
-          <CardHeader>
-            <CardTitle>Catalog Health</CardTitle>
-            <CardDescription>Metadata completion score</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center justify-center h-[200px] space-y-4">
-            
-            {/* Circular or Bar Progress */}
-            <div className="relative flex items-center justify-center">
-              <div className="text-5xl font-bold text-slate-900">{data.healthScore}%</div>
-            </div>
-            
-            <div className="w-full bg-gray-100 rounded-full h-4 overflow-hidden">
-              <div 
-                className={`h-full rounded-full ${data.healthScore === 100 ? 'bg-green-500' : 'bg-blue-600'}`} 
-                style={{ width: `${data.healthScore}%` }}
-              ></div>
-            </div>
-
-            <p className="text-center text-sm text-gray-500">
-              {data.songsWithIswc} of {data.totalSongs} songs have valid ISWCs.
-              {data.healthScore < 100 && " Add missing codes to reach 100%."}
-            </p>
-
-          </CardContent>
-        </Card>
-
-        {/* QUADRANT 3: RECENT RELEASES (Real Data with Artwork) */}
+        {/* QUADRANT 3 (BL): RECENT RELEASES */}
         <Card className="col-span-1 min-h-[350px]">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Recent Releases</CardTitle>
@@ -142,7 +139,6 @@ export default async function DashboardPage() {
                     <TableRow key={release.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          {/* NEW: Display Artwork */}
                           <ReleaseArtwork url={release.coverArtUrl} size="md" />
                           <div>
                             <div className="font-medium">{release.title}</div>
@@ -159,39 +155,8 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* QUADRANT 4: QUICK ACTIONS */}
-        <Card className="col-span-1 min-h-[350px] bg-slate-50 border-dashed">
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            
-            <Link href="/dashboard/songs/new">
-              <Button className="w-full h-16 text-lg justify-start gap-4" variant="outline">
-                <div className="bg-blue-100 p-2 rounded-full"><Music className="h-6 w-6 text-blue-600" /></div>
-                Register New Song
-                <ArrowRight className="ml-auto h-5 w-5 text-gray-400" />
-              </Button>
-            </Link>
-
-            <Link href="/dashboard/releases/new">
-              <Button className="w-full h-16 text-lg justify-start gap-4" variant="outline">
-                <div className="bg-green-100 p-2 rounded-full"><Disc className="h-6 w-6 text-green-600" /></div>
-                Add Master Release
-                <ArrowRight className="ml-auto h-5 w-5 text-gray-400" />
-              </Button>
-            </Link>
-
-            <Link href="/dashboard/ingest">
-              <Button className="w-full h-16 text-lg justify-start gap-4" variant="outline">
-                <div className="bg-purple-100 p-2 rounded-full"><Disc className="h-6 w-6 text-purple-600" /></div>
-                Import Catalog (CSV)
-                <ArrowRight className="ml-auto h-5 w-5 text-gray-400" />
-              </Button>
-            </Link>
-
-          </CardContent>
-        </Card>
+        {/* QUADRANT 4 (BR): ACTION ITEMS (The "Fix It" Box) */}
+        <UnregisteredSongsWidget songs={data.actionItems} />
 
       </div>
     </div>

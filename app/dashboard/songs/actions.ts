@@ -405,3 +405,56 @@ export async function deleteRelease(id: string, songId: string) {
     return { error: 'Failed to delete release.' }
   }
 }
+
+
+// --- NEW: CLAIM SONG ACTION ---
+export async function claimSong(songId: string) {
+  const userId = await getUserId()
+  if (!userId) return { error: 'Unauthorized' }
+
+  try {
+    // 1. Check if they already claimed it
+    const existingSplit = await db.writerSplit.findUnique({
+        where: {
+            userId_songId: { userId, songId }
+        }
+    });
+
+    if (existingSplit) {
+        // If they already have it, just go there
+        redirect(`/dashboard/songs/${songId}`);
+    }
+
+    // 2. Create the connection
+    const newSplit = await db.writerSplit.create({
+      data: {
+        songId,
+        userId,
+        percentage: 0.00, // Default to 0% so they are forced to input the real number
+        role: 'Composer', // Default role
+        adminStatus: 'UNCLAIMED'
+      }
+    });
+    
+    await createAuditLog({
+        userId: userId,
+        action: 'SONG_CLAIMED', // New Audit Action
+        entity: 'WriterSplit',
+        entityId: newSplit.id,
+        newData: newSplit,
+        oldData: undefined,
+    });
+
+  } catch (error) {
+    // If the error is a NEXT_REDIRECT, re-throw it so Next.js handles the navigation
+    if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
+        throw error;
+    }
+    console.error("CLAIM SONG ERROR:", error)
+    return { error: 'Failed to claim song.' }
+  }
+
+  // 3. Send them to the detail page to finish setup
+  revalidatePath('/dashboard/songs')
+  redirect(`/dashboard/songs/${songId}`)
+}

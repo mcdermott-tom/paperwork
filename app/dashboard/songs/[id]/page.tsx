@@ -1,18 +1,15 @@
-// app/dashboard/songs/[id]/page.tsx
-
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Disc, Music2, Plus, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { Disc, Music2, Plus, AlertTriangle, CheckCircle2, FileSignature, AlertCircle } from 'lucide-react'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { notFound } from 'next/navigation'
 
 // Action Buttons
 import { DownloadSplitSheetButton } from './pdf-button'
 import { ExportCWRButton } from './export-button'
-import { SignContractButton } from './sign-contract-button' // <--- FIX 1: Named Import
+import { SignContractButton } from './sign-contract-button' 
 
 // Client Components
 import { 
@@ -39,7 +36,7 @@ async function getSongData(songId: string) {
     include: {
       writers: { 
         where: { songId: songId },
-        include: { user: { select: { id: true, name: true, email: true } } } // Include ID for matching
+        include: { user: { select: { id: true, name: true, email: true } } } 
       },
       releases: {
         select: { id: true, title: true, isrc: true, coverArtUrl: true } 
@@ -58,7 +55,7 @@ async function getSongData(songId: string) {
 export default async function SongDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   
-  // 1. Auth Check (Needed to identify which writer is viewing the page)
+  // 1. Auth Check 
   const cookieStore = await cookies()
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -67,9 +64,7 @@ export default async function SongDetailPage({ params }: { params: Promise<{ id:
   )
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) return (
-    <div className="p-6">Unauthorized</div>
-  )
+  if (!user) return <div className="p-6">Unauthorized</div>
 
   // 2. Fetch Song Data
   const song = await getSongData(id)
@@ -91,10 +86,7 @@ export default async function SongDetailPage({ params }: { params: Promise<{ id:
     collected: writer.collected ? writer.collected.toNumber() : 0, 
   }));
 
-  // Identify the specific writer entry for the logged-in user
   const currentWriter = writersForClient.find(w => w.userId === user.id);
-  
-  // Check if they have signed the Admin LOD (using the new field)
   const hasSignedLOD = currentWriter?.adminStatus === 'SIGNED_LOD';
 
   const songMetadata = {
@@ -106,20 +98,51 @@ export default async function SongDetailPage({ params }: { params: Promise<{ id:
   const featuredCoverArtUrl = song.releases.find(r => r.coverArtUrl)?.coverArtUrl || null;
   const displayISWC = formatISWC(song.iswc);
   
-  // Validation for Export
   const totalPercentage = writersForClient.reduce((sum, w) => sum + w.percentage, 0);
   const isTotalValid = Math.abs(totalPercentage - 100) < 0.001;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
       
+      {/* --- NEW: STATUS BANNER --- */}
+      {/* Priority 1: Invalid Splits */}
+      {!isTotalValid ? (
+         <div className="p-4 rounded-lg border border-red-200 bg-red-50 dark:bg-red-500/10 dark:border-red-500/20 flex items-center gap-3 text-red-700 dark:text-red-400">
+            <AlertTriangle className="h-5 w-5" />
+            <div className="flex-1">
+               <h3 className="font-semibold">Splits are invalid</h3>
+               <p className="text-sm opacity-90">Total ownership is {totalPercentage.toFixed(2)}%. It must equal exactly 100%.</p>
+            </div>
+         </div>
+      ) : !hasSignedLOD ? (
+         // Priority 2: Unsigned Paperwork
+         <div className="p-4 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-500/10 dark:border-blue-500/20 flex items-center gap-3 text-blue-700 dark:text-blue-400">
+            <FileSignature className="h-5 w-5" />
+            <div className="flex-1">
+               <h3 className="font-semibold">Signature Required</h3>
+               <p className="text-sm opacity-90">You must sign the split agreement to activate collection.</p>
+            </div>
+            {/* The button is in the toolbar below, but we could duplicate it here if we wanted */}
+         </div>
+      ) : !song.iswc ? (
+         // Priority 3: Missing Metadata
+         <div className="p-4 rounded-lg border border-orange-200 bg-orange-50 dark:bg-orange-500/10 dark:border-orange-500/20 flex items-center gap-3 text-orange-700 dark:text-orange-400">
+            <AlertCircle className="h-5 w-5" />
+            <div className="flex-1">
+               <h3 className="font-semibold">Missing ISWC</h3>
+               <p className="text-sm opacity-90">Add your International Standard Musical Work Code to ensure proper tracking.</p>
+            </div>
+         </div>
+      ) : null}
+
+
       {/* HEADER */}
       <div className="flex items-start justify-between border-b pb-4">
         <div>
           <h1 className="text-3xl font-bold">{song.title}</h1>
           <p className="text-gray-500 flex items-center gap-2 mt-1">
             <Music2 className="h-4 w-4" /> 
-            ISWC: {displayISWC || 'Not Registered'}
+            ISWC: {displayISWC || <span className="text-orange-500">Missing</span>}
           </p>
         </div>
         <DeleteSongButton songId={song.id} songTitle={song.title} />
@@ -172,18 +195,16 @@ export default async function SongDetailPage({ params }: { params: Promise<{ id:
              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
                <h2 className="text-xl font-bold">Writers (Composition)</h2>
                
-               {/* TOOLBAR: Download, Export, Sign */}
+               {/* TOOLBAR */}
                <div className={`flex gap-2 transition-opacity ${!isTotalValid ? 'opacity-50 pointer-events-none' : ''}`}>
                   <DownloadSplitSheetButton song={songMetadata} writers={writersForClient} />
                   <ExportCWRButton songId={song.id} />
                   
-                  {/* FIX 2: Check Admin Status for Green Button */}
                   {hasSignedLOD ? (
-                    <Button disabled variant="secondary" className="gap-2 bg-green-100 text-green-800 border border-green-200 opacity-100">
+                    <Button disabled variant="secondary" className="gap-2 bg-green-100 text-green-800 border border-green-200 opacity-100 dark:bg-green-500/20 dark:text-green-400 dark:border-green-500/50">
                         <CheckCircle2 className="h-4 w-4" /> Signed
                     </Button>
                   ) : (
-                    // FIX 3: Pass Required Props (songTitle, userLegalName)
                     <SignContractButton 
                       songId={song.id} 
                       songTitle={song.title}
@@ -192,13 +213,6 @@ export default async function SongDetailPage({ params }: { params: Promise<{ id:
                   )}
                </div>
              </div>
-             
-             {!isTotalValid && (
-                <div className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded flex items-center gap-2 border border-red-200">
-                    <AlertTriangle className="h-4 w-4" />
-                    Splits must equal exactly 100% to sign or export.
-                </div>
-             )}
              
              <WritersTable writers={writersForClient} songId={song.id} />
           </section>

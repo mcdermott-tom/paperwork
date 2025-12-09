@@ -1,4 +1,3 @@
-// app/dashboard/songs/[id]/detail-client.tsx
 'use client'
 
 import { useState } from 'react'
@@ -11,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Trash2, Pencil, UserPlus } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
+
 
 export interface ClientRelease {
   id: string;
@@ -145,13 +145,21 @@ export function ReleasesTable({ releases }: { releases: ClientRelease[] }) {
 }
 
 // --- 4. WRITERS TABLE ---
-export function WritersTable({ writers, songId }: { writers: ClientWriter[], songId: string }) {
+interface WritersTableProps {
+  writers: ClientWriter[];
+  songId: string;
+  hasSplits?: boolean; // NEW PROP
+}
+
+export function WritersTable({ writers, songId, hasSplits = true }: WritersTableProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingWriter, setEditingWriter] = useState<ClientWriter | null>(null);
 
   const totalPercentage = writers.reduce((sum, w) => sum + w.percentage, 0);
-  // FIX: Stricter epsilon check (0.001) ensures 100.01 is marked invalid
   const isValidTotal = Math.abs(totalPercentage - 100) < 0.001;
+
+  // If hasSplits wasn't passed, try to infer it from the percentage
+  const showChart = hasSplits && totalPercentage > 0;
 
   const handleDelete = async (splitId: string) => {
     if (confirm("Remove this writer?")) await deleteSplit(splitId, songId);
@@ -216,8 +224,9 @@ export function WritersTable({ writers, songId }: { writers: ClientWriter[], son
       </Table>
       </Card>
 
-      {/* 2. CHART (Ownership Breakdown) - ON BOTTOM */}
-      <Card>
+      {/* 2. CHART (Ownership Breakdown) - CONDITIONALLY RENDERED */}
+      {showChart && writers.length > 0 && (
+        <Card>
             <CardContent className="pt-6">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="font-semibold text-sm">Ownership Visualization</h3>
@@ -225,13 +234,10 @@ export function WritersTable({ writers, songId }: { writers: ClientWriter[], son
                         Total: {totalPercentage.toFixed(2)}%
                     </span>
                 </div>
-                {writers.length > 0 ? (
-                    <CompositionPieChart writers={writers} />
-                ) : (
-                    <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">No splits defined.</div>
-                )}
+                <CompositionPieChart writers={writers} />
             </CardContent>
         </Card>
+      )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>

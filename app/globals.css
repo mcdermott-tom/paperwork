@@ -158,3 +158,29 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom Scrollbar - Cross Browser Support */
+.custom-scrollbar {
+  scrollbar-width: thin;          /* Firefox */
+  scrollbar-color: #475569 transparent; /* Firefox */
+}
+
+/* Chrome, Edge, and Safari */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px; /* Slightly slimmer */
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #475569; /* slate-600 */
+  border-radius: 20px;       /* Fully rounded pills */
+  border: 2px solid transparent; /* padding around thumb */
+  background-clip: content-box;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #64748b; /* slate-500 */
+}
