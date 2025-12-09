@@ -73,17 +73,29 @@ export async function ingestCsvBatch(rows: any[]) {
         await db.song.update({ where: { id: song.id }, data: { iswc: iswcClean } });
       }
 
-      // 3. CREATE RELEASE (If ISRC exists - usually from DistroKid/Spotify CSVs)
+      // 3. CREATE OR UPDATE RELEASE (Fixed: Removed upsert on non-unique isrc)
       if (isrcClean) {
-        await db.release.upsert({
-          where: { isrc: isrcClean },
-          update: { title },
-          create: {
-            songId: song.id,
-            title,
-            isrc: isrcClean
-          }
+        // A. Try to find an existing release with this ISRC
+        const existingRelease = await db.release.findFirst({
+          where: { isrc: isrcClean }
         });
+
+        if (existingRelease) {
+          // B. Update it if found
+          await db.release.update({
+            where: { id: existingRelease.id },
+            data: { title }
+          });
+        } else {
+          // C. Create if not found
+          await db.release.create({
+            data: {
+              songId: song.id,
+              title,
+              isrc: isrcClean
+            }
+          });
+        }
       }
 
       createdCount++;
