@@ -77,10 +77,9 @@
   --accent: #e1e5f2;
   --accent-foreground: #1f7a8c;
 
-  /* Semantic Colors (Restored Punch) */
-  --destructive: #ef4444; /* Standard Red */
+  /* Semantic Colors */
+  --destructive: #ef4444; 
   --destructive-foreground: #ffffff;
-  /* (You can use tailwind classes like text-green-600 for success) */
 
   /* Borders */
   --border: #bfdbf7;
@@ -88,11 +87,11 @@
   --ring: #1f7a8c;
 
   /* Charts */
-  --chart-1: #022b3a; /* Deep Navy */
-  --chart-2: #1f7a8c; /* Teal */
-  --chart-3: #bfdbf7; /* Light Blue */
-  --chart-4: #eab308; /* Yellow */
-  --chart-5: #ef4444; /* Red */
+  --chart-1: #022b3a; 
+  --chart-2: #1f7a8c; 
+  --chart-3: #bfdbf7; 
+  --chart-4: #eab308; 
+  --chart-5: #ef4444; 
 
   /* Sidebar */
   --sidebar: #ffffff;
@@ -110,15 +109,15 @@
   --background: #022b3a;
   --foreground: #e1e5f2;
 
-  --card: #1f2937; /* Darker Slate */
+  --card: #1f2937; 
   --card-foreground: #e1e5f2;
   --popover: #022b3a;
   --popover-foreground: #e1e5f2;
 
-  --primary: #bfdbf7; /* Light Blue for contrast on dark */
+  --primary: #bfdbf7; 
   --primary-foreground: #022b3a;
 
-  --secondary: #1f7a8c; /* Teal */
+  --secondary: #1f7a8c; 
   --secondary-foreground: #ffffff;
 
   --muted: #1e293b;
@@ -154,20 +153,28 @@
   * {
     @apply border-border outline-ring/50;
   }
+  
+  /* MOBILE FIX: Prevent horizontal scrolling and improve touch feel */
+  html,
   body {
+    height: 100%;
+    width: 100%;
+    overflow-x: hidden; /* Critical for mobile to prevent 'wobbly' scroll */
+    -webkit-font-smoothing: antialiased; /* Makes fonts crisp on iOS */
+    -moz-osx-font-smoothing: grayscale;
     @apply bg-background text-foreground;
   }
 }
 
 /* Custom Scrollbar - Cross Browser Support */
 .custom-scrollbar {
-  scrollbar-width: thin;          /* Firefox */
-  scrollbar-color: #475569 transparent; /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: #475569 transparent;
 }
 
 /* Chrome, Edge, and Safari */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px; /* Slightly slimmer */
+  width: 6px; 
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -175,12 +182,12 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #475569; /* slate-600 */
-  border-radius: 20px;       /* Fully rounded pills */
-  border: 2px solid transparent; /* padding around thumb */
+  background-color: #475569; 
+  border-radius: 20px;      
+  border: 2px solid transparent; 
   background-clip: content-box;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: #64748b; /* slate-500 */
+  background-color: #64748b; 
 }
