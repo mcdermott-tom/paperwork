@@ -10,7 +10,7 @@ export default function Home() {
       <header className="flex flex-col items-center justify-center px-6 pt-32 pb-20 text-center lg:pt-48 lg:pb-32">
         <div className="mx-auto max-w-3xl space-y-8">
           
-          {/* The "Beta" Badge - optional but looks cool */}
+          {/* The "Beta" Badge */}
           <div className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
             <span className="flex h-2 w-2 rounded-full bg-blue-600 mr-2 animate-pulse"></span>
             Now accepting early access
@@ -99,16 +99,29 @@ export default function Home() {
       {/* 3. FOOTER / TRUST */}
       <footer className="py-12 text-center text-muted-foreground">
         <div className="container mx-auto px-6 border-t border-border pt-12">
+          
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="font-bold text-foreground">Paperwork</div>
+            
+            {/* COPYRIGHT */}
             <div className="text-sm">
-              &copy; {new Date().getFullYear()} Paperwork Administration, LLC. All rights reserved.
+              &copy; {new Date().getFullYear()} PAPERWORK ROYALTIES LLC. All rights reserved.
             </div>
+
+            {/* LINKS */}
             <div className="flex gap-6 text-sm">
-              <Link href="#" className="hover:text-foreground">Terms</Link>
-              <Link href="#" className="hover:text-foreground">Privacy</Link>
+              <Link href="/terms" className="hover:text-foreground">Terms</Link>
+              <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
             </div>
           </div>
+
+          {/* LEGAL DISCLAIMER - The "Safe Harbor" text */}
+          <div className="mt-8 text-xs text-muted-foreground/60 max-w-2xl mx-auto">
+            Paperwork is an independent technology platform for music rights administration. 
+            We are not affiliated with, endorsed by, or sponsored by DistroKid, CD Baby, Tunecore, Spotify, or Apple Music. 
+            All trademarks are the property of their respective owners.
+          </div>
+
         </div>
       </footer>
 
